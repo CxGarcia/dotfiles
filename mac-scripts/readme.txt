@@ -1,0 +1,1 @@
+compile command: shc -f cdd.zsh
