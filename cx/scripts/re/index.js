@@ -19,55 +19,59 @@ const basePath = fs.existsSync('./src')
 for (const arg of argv['_']) {
   const [first, ...rest] = arg;
   const componentName = first.toUpperCase() + rest.join('');
-  const dir = path.join(basePath, componentName);
-  const file = path.join(dir, componentName);
-  const txt = txtModule(componentName);
+  const dirPath = path.join(basePath, componentName);
 
   //skip dir creation if it already exists
-  if (fs.existsSync(dir)) {
+  if (fs.existsSync(dirPath)) {
     console.log(
-      `${componentName} already exists at: ${dir} - will skip its creation until the directory is deleted`
+      `${componentName} already exists at: ${dirPath} - will skip its creation until the directory is deleted`
     );
 
     continue;
   }
 
+  //call the filesModule func defined below
+  const files = filesModule(componentName, dirPath);
+  const keys = Object.keys(files);
+
   //create dir
-  fs.mkdirSync(dir);
+  fs.mkdirSync(dirPath);
 
-  //create js file
-  fs.appendFile(`${file}.js`, txt['component'], function (err) {
-    if (err) throw err;
+  //loop through different files and create
+  keys.forEach((key) => {
+    const { path, txt, conditional } = files[key];
+
+    //check if this particular file requires the user to pass a flag,
+    //and if it does, check if the user actually passed it before creating the file
+    if (conditional && !argv[conditional]) return;
+
+    createFile(path, txt);
   });
 
-  //scss module
-  fs.appendFile(`${file}.module.scss`, txt['scss'], function (err) {
-    if (err) throw err;
-  });
-
-  //test file
-  if (argv['t']) {
-    fs.appendFile(`${file}.test.js`, txt['test'], function (err) {
-      if (err) throw err;
-    });
-  }
-
-  //barrel
-  fs.appendFile(path.join(dir, 'index.js'), txt['barrel'], function (err) {
-    if (err) throw err;
-  });
-
-  console.log(`${componentName} has been created successfully at: ${dir}`);
+  console.log(`${componentName} has been created successfully at: ${dirPath}`);
 }
 
-function txtModule(componentName) {
+function createFile(path, content) {
+  fs.writeFile(path, content, function (err) {
+    if (err) throw err;
+  });
+}
+
+function filesModule(componentName, dirPath) {
+  const filePath = path.join(dirPath, componentName);
+
   return {
-    barrel: `
+    barrel: {
+      path: path.join(dirPath, 'index.js'),
+      txt: `
       import ${componentName} from './${componentName}';
 
       export default ${componentName};
     `,
-    component: `
+    },
+    component: {
+      path: `${filePath}.js`,
+      txt: `
       import React from 'react';
       import styles from './${componentName}.module.scss';
 
@@ -77,7 +81,11 @@ function txtModule(componentName) {
 
       export default ${componentName};
     `,
-    test: `
+    },
+    test: {
+      path: `${filePath}.test.js`,
+      conditional: 't',
+      txt: `
       import { render, screen } from '@testing-library/react';
       import ${componentName} from './${componentName}';
 
@@ -85,6 +93,10 @@ function txtModule(componentName) {
         render(<${componentName} />);
       });
     `,
-    scss: "@import 'styles/main.scss';",
+    },
+    scss: {
+      path: `${filePath}.module.scss`,
+      txt: "@import 'styles/main.scss';",
+    },
   };
 }
