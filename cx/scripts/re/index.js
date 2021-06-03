@@ -8,11 +8,7 @@ const cwd = process.cwd();
 //filter out flags from args array
 const filteredArgs = args.filter((arg) => !arg.startsWith('-'));
 
-const basePath = fs.existsSync('./src')
-  ? path.join(cwd, 'src', 'components')
-  : fs.existsSync('./components')
-  ? path.join(cwd, 'components')
-  : '.';
+const basePath = path.resolve('src', 'components');
 
 for (const arg of filteredArgs) {
   const [first, ...rest] = arg;
@@ -51,7 +47,7 @@ for (const arg of filteredArgs) {
   }
 
   //barrel roll
-  fs.appendFile(path.join(dir, 'index.js'), txt['barrelRoll'], function (err) {
+  fs.appendFile(path.join(dir, 'index.js'), txt['barrel'], function (err) {
     if (err) throw err;
   });
 
@@ -60,7 +56,7 @@ for (const arg of filteredArgs) {
 
 function txtModule(componentName) {
   return {
-    barrelRoll: `
+    barrel: `
       import ${componentName} from './${componentName}';
 
       export default ${componentName};
@@ -75,7 +71,6 @@ function txtModule(componentName) {
 
       export default ${componentName};
     `,
-    scss: "@import 'styles/main.scss';",
     test: `
       import { render, screen } from '@testing-library/react';
       import ${componentName} from './${componentName}';
@@ -84,5 +79,6 @@ function txtModule(componentName) {
         render(<${componentName} />);
       });
     `,
+    scss: "@import 'styles/main.scss';",
   };
 }
