@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
 
-const args = process.argv.slice(2);
-const cwd = process.cwd();
+const argv = yargs(hideBin(process.argv)).option('test', {
+  alias: 't',
+  type: 'boolean',
+  description: 'add test files',
+}).argv;
 
-//filter out flags from args array
-const filteredArgs = args.filter((arg) => !arg.startsWith('-'));
+const basePath = fs.existsSync('./src')
+  ? path.resolve('src', 'components')
+  : fs.existsSync('./components')
+  ? path.resolve('components')
+  : '.';
 
-const basePath = path.resolve('src', 'components');
-
-for (const arg of filteredArgs) {
+for (const arg of argv['_']) {
   const [first, ...rest] = arg;
   const componentName = first.toUpperCase() + rest.join('');
   const dir = path.join(basePath, componentName);
@@ -40,13 +46,13 @@ for (const arg of filteredArgs) {
   });
 
   //test file
-  if (args.includes('-t')) {
+  if (argv['t']) {
     fs.appendFile(`${file}.test.js`, txt['test'], function (err) {
       if (err) throw err;
     });
   }
 
-  //barrel roll
+  //barrel
   fs.appendFile(path.join(dir, 'index.js'), txt['barrel'], function (err) {
     if (err) throw err;
   });

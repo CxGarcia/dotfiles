@@ -12,5 +12,8 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "yargs": "^17.0.1"
+  }
 }

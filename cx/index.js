@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const yargs = require('yargs/yargs');
 const { exec } = require('child_process');
+const { hideBin } = require('yargs/helpers');
 
-const args = process.argv.slice(2);
-const cwd = process.cwd();
-
-//filter out flags from args array
-const filteredArgs = args.filter((arg) => !arg.startsWith('-'));
-
-const cmdPath = path.join(__dirname, 'scripts', args[0]);
+const argv = yargs(hideBin(process.argv)).argv;
+const cmdPath = path.join(__dirname, 'scripts', argv['_'][0]);
 
 if (fs.existsSync(cmdPath)) {
   const cmd = exec(
