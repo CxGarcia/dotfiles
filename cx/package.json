@@ -2,7 +2,7 @@
   "name": "cx",
   "bin": {
     "cx": "./index.js",
-    "re": "./scripts/re/"
+    "re": "./scripts/re/index.js"
   },
   "version": "1.0.0",
   "description": "",

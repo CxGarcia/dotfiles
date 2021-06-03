@@ -19,6 +19,7 @@ for (const arg of filteredArgs) {
   const componentName = first.toUpperCase() + rest.join('');
   const dir = path.join(basePath, componentName);
   const file = path.join(dir, componentName);
+  const txt = txtModule(componentName);
 
   //skip dir creation if it already exists
   if (fs.existsSync(dir)) {
@@ -33,62 +34,55 @@ for (const arg of filteredArgs) {
   fs.mkdirSync(dir);
 
   //create js file
-  fs.appendFile(
-    `${file}.js`,
-    `
-import React from 'react';
-import styles from './${componentName}.module.scss';
-
-function ${componentName}({}) {
-  return <div></div>;
-}
-
-export default ${componentName};
-  `.trim(),
-    function (err) {
-      if (err) throw err;
-    }
-  );
+  fs.appendFile(`${file}.js`, txt['component'], function (err) {
+    if (err) throw err;
+  });
 
   //scss module
-  fs.appendFile(
-    `${file}.module.scss`,
-    "@import 'styles/main.scss';",
-    function (err) {
-      if (err) throw err;
-    }
-  );
+  fs.appendFile(`${file}.module.scss`, txt['scss'], function (err) {
+    if (err) throw err;
+  });
 
   //test file
   if (args.includes('-t')) {
-    fs.appendFile(
-      `${file}.test.js`,
-      `
-import { render, screen } from '@testing-library/react';
-import ${componentName} from './${componentName}';
-
-test('first test', () => {
-render(<${componentName} />);
-});
-      `.trim(),
-      function (err) {
-        if (err) throw err;
-      }
-    );
+    fs.appendFile(`${file}.test.js`, txt['test'], function (err) {
+      if (err) throw err;
+    });
   }
 
   //barrel roll
-  fs.appendFile(
-    path.join(dir, 'index.js'),
-    `
-import ${componentName} from './${componentName}';
-
-export default ${componentName};
-  `.trim(),
-    function (err) {
-      if (err) throw err;
-    }
-  );
+  fs.appendFile(path.join(dir, 'index.js'), txt['barrelRoll'], function (err) {
+    if (err) throw err;
+  });
 
   console.log(`${componentName} has been created successfully at: ${dir}`);
+}
+
+function txtModule(componentName) {
+  return {
+    barrelRoll: `
+      import ${componentName} from './${componentName}';
+
+      export default ${componentName};
+    `,
+    component: `
+      import React from 'react';
+      import styles from './${componentName}.module.scss';
+
+      function ${componentName}({}) {
+        return <div></div>;
+      }
+
+      export default ${componentName};
+    `,
+    scss: "@import 'styles/main.scss';",
+    test: `
+      import { render, screen } from '@testing-library/react';
+      import ${componentName} from './${componentName}';
+
+      test('first test', () => {
+        render(<${componentName} />);
+      });
+    `,
+  };
 }
