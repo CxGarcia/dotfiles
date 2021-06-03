@@ -12,14 +12,19 @@ const filteredArgs = args.filter((arg) => !arg.startsWith('-'));
 const cmdPath = path.join(__dirname, 'scripts', args[0]);
 
 if (fs.existsSync(cmdPath)) {
-  // console.log('hiya');
-  const cxSpawn = exec(path.join(cmdPath, 'index.js'), args.slice(1));
+  const cmd = exec(
+    `${path.join(cmdPath, 'index.js')} ${args.slice(1).join(' ')}`
+  );
 
-  cxSpawn.stdout.on('data', (data) => {
+  cmd.stdout.on('error', (err) => {
+    if (err) throw err;
+  });
+
+  cmd.stdout.on('data', (data) => {
     console.log(data);
   });
 
-  cxSpawn.stderr.on('data', (data) => {
+  cmd.stderr.on('data', (data) => {
     console.error(`error: ${data}`);
   });
-}
+} else console.log('cmd does not exists');
