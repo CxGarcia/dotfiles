@@ -11,8 +11,6 @@ const argv = yargs(hideBin(process.argv)).option('cmd', {
   description: 'add its own command in the cli',
 }).argv;
 
-console.log(argv);
-
 for (const cmd of argv['_']) {
   const scriptsDir = path.join(__dirname, '..');
   const dirPath = path.join(scriptsDir, cmd);
@@ -34,16 +32,18 @@ for (const cmd of argv['_']) {
 
   //loop through different files and create
   keys.forEach((key) => {
-    const { path, txt, conditional } = files[key];
+    const { path, content, conditional } = files[key];
 
     //check if this particular file requires the user to pass a flag,
     //and if it does, check if the user actually passed it before creating the file
     if (conditional && !argv[conditional]) return;
 
-    writeFile(path, txt.trim());
+    writeFile(path, content.trim());
   });
 
   if (argv['c']) createCmd(cmd);
+
+  console.log('script created successfully!');
 }
 
 function writeFile(path, content) {
@@ -57,7 +57,7 @@ function filesModule(dirPath) {
   return {
     index: {
       path: path.join(dirPath, 'index.js'),
-      txt: `
+      content: `
         #!/usr/bin/env node
         const fs = require('fs');
         const path = require('path');
@@ -77,11 +77,13 @@ async function createCmd(cmd) {
 
   pkgJson['bin'] = { ...bin, [cmd]: `./scripts/${cmd}/index.js` };
 
-  const _ = await writeFile(pkgPath, JSON.stringify(pkgJson));
+  await writeFile(pkgPath, JSON.stringify(pkgJson));
 
   exec('npm link', {
     cwd: __dirname,
   });
+
+  console.log('link created successfully!');
 }
 
 async function getPkgJson() {
