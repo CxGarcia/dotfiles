@@ -8,7 +8,7 @@ const { hideBin } = require('yargs/helpers');
 const argv = yargs(hideBin(process.argv)).option('cmd', {
   alias: 'c',
   type: 'boolean',
-  description: 'add its own command in the cli',
+  description: 'add command to the cli and link through npm',
 }).argv;
 
 for (const cmd of argv['_']) {
@@ -70,7 +70,7 @@ function filesModule(dirPath) {
   };
 }
 
-//add cmd to bin and npm link so we can use the command anywhere without having to do 'node <cmd>'
+//add cmd to bin and npm link so we can use the command anywhere without having to 'node <cmdPath>'
 async function createCmd(cmd) {
   const { pkgPath, pkgJson } = await getPkgJson();
   const { bin } = pkgJson;
