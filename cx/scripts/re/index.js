@@ -30,12 +30,12 @@ for (const arg of argv['_']) {
     continue;
   }
 
-  //call the filesModule func defined below
-  const files = filesModule(componentName, dirPath);
-  const keys = Object.keys(files);
-
   //create dir
   fs.mkdirSync(dirPath);
+
+  //create files module
+  const files = filesModule(componentName, dirPath);
+  const keys = Object.keys(files);
 
   //loop through different files and create
   keys.forEach((key) => {
@@ -44,7 +44,6 @@ for (const arg of argv['_']) {
     //check if this particular file requires the user to pass a flag,
     //and if it does, check if the user actually passed it before creating the file
     if (conditional && !argv[conditional]) return;
-
     createFile(path, txt);
   });
 
