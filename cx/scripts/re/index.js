@@ -39,12 +39,12 @@ for (const arg of argv['_']) {
 
   //loop through different files and create
   keys.forEach((key) => {
-    const { path, txt, conditional } = files[key];
+    const { path, content, conditional } = files[key];
 
     //check if this particular file requires the user to pass a flag,
     //and if it does, check if the user actually passed it before creating the file
     if (conditional && !argv[conditional]) return;
-    createFile(path, txt);
+    createFile(path, content);
   });
 
   console.log(`${componentName} has been created successfully at: ${dirPath}`);
@@ -62,7 +62,7 @@ function filesModule(componentName, dirPath) {
   return {
     barrel: {
       path: path.join(dirPath, 'index.js'),
-      txt: `
+      content: `
       import ${componentName} from './${componentName}';
 
       export default ${componentName};
@@ -70,7 +70,7 @@ function filesModule(componentName, dirPath) {
     },
     component: {
       path: `${filePath}.js`,
-      txt: `
+      content: `
       import React from 'react';
       import styles from './${componentName}.module.scss';
 
@@ -84,7 +84,7 @@ function filesModule(componentName, dirPath) {
     test: {
       path: `${filePath}.test.js`,
       conditional: 't',
-      txt: `
+      content: `
       import { render, screen } from '@testing-library/react';
       import ${componentName} from './${componentName}';
 
@@ -95,7 +95,7 @@ function filesModule(componentName, dirPath) {
     },
     scss: {
       path: `${filePath}.module.scss`,
-      txt: "@import 'styles/main.scss';",
+      content: "@import 'styles/main.scss';",
     },
   };
 }
