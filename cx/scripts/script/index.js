@@ -38,7 +38,7 @@ for (const cmd of argv['_']) {
     //and if it does, check if the user actually passed it before creating the file
     if (conditional && !argv[conditional]) return;
 
-    writeFile(path, content.trim());
+    writeFile(path, content.trim(), { mode: 0o755 });
   });
 
   if (argv['c']) createCmd(cmd);
@@ -46,9 +46,9 @@ for (const cmd of argv['_']) {
   console.log('script created successfully!');
 }
 
-function writeFile(path, content) {
+function writeFile(path, content, opts = {}) {
   //file with 755 permission
-  fs.writeFile(path, content, { mode: 0o755 }, function (err) {
+  fs.writeFile(path, content, opts, function (err) {
     if (err) throw err;
   });
 }
@@ -69,6 +69,9 @@ function filesModule(dirPath) {
     },
   };
 }
+
+//path to bin
+//./System/Volumes/Data/Users/cristobalschlaubitz/.fnm/node-versions/v16.1.0/installation/bin/cx
 
 //add cmd to bin and npm link so we can use the command anywhere without having to 'node <cmdPath>'
 async function createCmd(cmd) {
