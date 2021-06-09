@@ -8,7 +8,7 @@ export ZSH="/Users/cristobalschlaubitz/.oh-my-zsh"
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="agnoster"
+# ZSH_THEME="agnoster"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -68,6 +68,7 @@ ZSH_THEME="agnoster"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
+
 plugins=(git)
 
 source $ZSH/oh-my-zsh.sh
@@ -104,14 +105,9 @@ source $ZSH/oh-my-zsh.sh
 unsetopt PROMPT_SP
 
 
-# Highlight commands
-source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-
 # Adds a blank line between prompts
-POWERLEVEL9K_PROMPT_ADD_NEWLINE=true
-
-POWERLEVEL9K_VCS_MODIFIED_BACKGROUND=’red’
+#POWERLEVEL9K_PROMPT_ADD_NEWLINE=true
+#POWERLEVEL9K_VCS_MODIFIED_BACKGROUND=’red’
 
 ## Startup Directory ##
 ## cd ~/Documents/Codeworks ##
@@ -128,10 +124,45 @@ POWERLEVEL9K_VCS_MODIFIED_BACKGROUND=’red’
 
 
 ## Including cxscripts : ICU4C : yarn in path
-#export PATH="$PATH:$HOME/.cxscripts:/usr/local/opt/icu4c/bin:/usr/local/opt/icu4c/sbin:$HOME/.yarn/#bin:$HOME/.config/yarn/global/node_modules/.bin"
+## export PATH="$PATH:$HOME/.cxscripts:/usr/local/opt/icu4c/bin:/usr/local/opt/icu4c/sbin:
 
-#source $HOME/.cxscripts/cdd-completion.zsh
+#$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin"
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+export PATH="$PATH:/usr/local/sbin:$PATH"
+
+#syntax Highlight
+source /Users/cristobalschlaubitz/.oh-my-zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+
+#starship prompt
+eval "$(starship init zsh)"
+
+#fnm node manager
+eval "$(fnm env)"
+
+#######ALIASES#######
+
+##sync brancher w/ remote and delete all local
+alias gbda="git fetch --prune && git branch --v | grep '\[gone\]' | awk '{print $1}' | xargs git branch -D"
+
+##get current size of all node_modules
+alias nmgs="find . -name "node_modules" -type d -prune -print | xargs du -chs"
+
+##delete all node_modules
+alias nmda="find . -name "node_modules" -type d -prune -exec rm -rf '{}' +"
+
+##push sync retropie
+alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.1.183:~/RetroPie/roms/"
+
+#######END-ALIASES#######
+
+#prevent brew from updating on every install
+export HOMEBREW_NO_AUTO_UPDATE=1
+
+#completions
+zstyle :compinstall filename '/Users/cristobalschlaubitz/.zshrc'
+
+autoload -Uz compinit
+fpath+=~/.zfunc
+
+compinit
