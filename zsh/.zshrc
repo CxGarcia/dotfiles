@@ -1,3 +1,8 @@
+
+#### FIG ENV VARIABLES ####
+# Please make sure this block is at the start of this file.
+[ -s ~/.fig/shell/pre.sh ] && source ~/.fig/shell/pre.sh
+#### END FIG ENV VARIABLES ####
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -109,9 +114,6 @@ unsetopt PROMPT_SP
 #POWERLEVEL9K_PROMPT_ADD_NEWLINE=true
 #POWERLEVEL9K_VCS_MODIFIED_BACKGROUND=’red’
 
-## Startup Directory ##
-## cd ~/Documents/Codeworks ##
-
 ## getting python environment PIPENV in terminal ##
 #export PATH="/Users/cristobalschlaubitz/Library/Python/3.7/lib/python/site-packages:$PATH"
 
@@ -122,13 +124,14 @@ unsetopt PROMPT_SP
 ##Jupyter command
 #alias jupyter='/Users/cristobalschlaubitz/Library/Python/3.7/bin/jupyter'
 
+autoload bashcompinit
 
-## Including cxscripts : ICU4C : yarn in path
-## export PATH="$PATH:$HOME/.cxscripts:/usr/local/opt/icu4c/bin:/usr/local/opt/icu4c/sbin:
 
-#$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin"
+export DEV="$HOME/dev"
+export CXBIN="$DEV/cx-scripts"
+export PATH="$PATH:$CXBIN:/usr/local/sbin"
 
-export PATH="$PATH:/usr/local/sbin:$PATH"
+source cdd-completion.zsh
 
 #syntax Highlight
 source /Users/cristobalschlaubitz/.oh-my-zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
@@ -153,6 +156,10 @@ alias nmda="find . -name "node_modules" -type d -prune -exec rm -rf '{}' +"
 
 ##push sync retropie
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.1.183:~/RetroPie/roms/"
+
+##ssh
+alias wpcloud="ssh cx@46.101.204.150"
+alias cxcloud="ssh cx159.89.111.58"
 
 #######END-ALIASES#######
 
