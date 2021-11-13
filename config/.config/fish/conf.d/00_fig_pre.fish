@@ -1,0 +1,1 @@
+/Users/cristobalschlaubitz/.fig/shell/pre.fish
