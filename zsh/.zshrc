@@ -128,13 +128,11 @@ autoload bashcompinit
 
 
 export DEV="$HOME/dev"
-export CXBIN="$DEV/cx-scripts"
+export CXBIN="$HOME/dotfiles/mac/mac-scripts"
 export PATH="$PATH:$CXBIN:/usr/local/sbin"
 
-source cdd-completion.zsh
-
 #syntax Highlight
-source /Users/cristobalschlaubitz/.oh-my-zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source $ZSH/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 
 #starship prompt
@@ -163,6 +161,8 @@ alias cxcloud="ssh cx159.89.111.58"
 
 #######END-ALIASES#######
 
+source $CXBIN/cdd-completion.zsh
+
 #prevent brew from updating on every install
 export HOMEBREW_NO_AUTO_UPDATE=1
 
@@ -173,3 +173,6 @@ autoload -Uz compinit
 fpath+=~/.zfunc
 
 compinit
+
+test -d "$HOME/.tea" && source <("$HOME/.tea/tea.xyz/v*/bin/tea" --magic=zsh --silent)
+SPACESHIP_TIME_SHOW=true

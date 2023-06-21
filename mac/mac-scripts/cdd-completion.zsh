@@ -1,12 +1,12 @@
 _flist () {
   COMPREPLY=()
   k=0
-  i="$HOME/Documents/code"
+  i=$DEV
 
   for entry in "$i"/*
   do
-	print entry
-	COMPREPLY[k++]=${entry#$i/}
+  print entry
+  COMPREPLY[k++]=${entry#$i/}
   done
   return null
 }
