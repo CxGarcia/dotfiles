@@ -127,9 +127,14 @@ unsetopt PROMPT_SP
 autoload bashcompinit
 
 
-export DEV="$HOME/dev"
-export CXBIN="$HOME/dotfiles/mac/mac-scripts"
-export PATH="$PATH:$CXBIN:/usr/local/sbin"
+
+export DEV=$HOME/dev
+export GOPATH=$HOME/go
+export GOBIN=$GOPATH/bin
+export NODEBIN=/opt/homebrew/Cellar/node@20/20.14.0/bin
+export CXBIN=$HOME/dotfiles/mac/mac-scripts
+export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:/usr/local/sbin"
+
 
 #syntax Highlight
 source $ZSH/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
@@ -150,10 +155,15 @@ alias gbda="git fetch --prune && git branch --v | grep '\[gone\]' | awk '{print 
 alias nmgs="find . -name "node_modules" -type d -prune -print | xargs du -chs"
 
 ##delete all node_modules
-alias nmda="find . -name "node_modules" -type d -prune -exec rm -rf '{}' +"
+alias nmda="seekndestroy node_modules"
+
+alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy build; seekndestroy .turbo; seekndestroy turbo;"
 
 ##push sync retropie
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.1.183:~/RetroPie/roms/"
+
+##zed as default editor
+alias code="zed"
 
 ##ssh
 alias wpcloud="ssh cx@46.101.204.150"
@@ -161,7 +171,7 @@ alias cxcloud="ssh cx159.89.111.58"
 
 #######END-ALIASES#######
 
-source $CXBIN/cdd-completion.zsh
+source $CXBIN/cdn-completion.zsh
 
 #prevent brew from updating on every install
 export HOMEBREW_NO_AUTO_UPDATE=1
@@ -176,3 +186,5 @@ compinit
 
 test -d "$HOME/.tea" && source <("$HOME/.tea/tea.xyz/v*/bin/tea" --magic=zsh --silent)
 SPACESHIP_TIME_SHOW=true
+
+eval "$(rbenv init - zsh)"

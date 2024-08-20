@@ -7,6 +7,20 @@ cdd() {
   fi
 }
 
+cdn() {
+nest_dir="$DEV/nest"
+
+  if [ -z "$1" ]
+    then
+      cd $nest_dir
+    elif [ "$1" = "commonlib" ]
+      then
+        cd $nest_dir/packages/commonlib
+    else
+      cd "$nest_dir/apps/$1"
+  fi
+}
+
 seekndestroy() {
   if [ -z "$1" ]
     then

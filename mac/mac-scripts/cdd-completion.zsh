@@ -1,15 +1,15 @@
-_flist () {
-  COMPREPLY=()
+_cddlist () {
+  COMPREPLYCDD=()
   k=0
   i=$DEV
 
   for entry in "$i"/*
   do
   print entry
-  COMPREPLY[k++]=${entry#$i/}
+  COMPREPLYCDD[k++]=${entry#$i/}
   done
   return null
 }
 
-complete -o nospace -F _flist cdd
+complete -o nospace -F _cddlist cdd
 
