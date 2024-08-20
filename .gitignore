@@ -71,3 +71,6 @@ web_modules/
 .env.test
 .env.production
 node_modules
+
+# raycast extensions
+/raycast/extensions/*
