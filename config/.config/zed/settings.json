@@ -40,6 +40,9 @@
   },
 
   "languages": {
+    "YAML": {
+      "format_on_save": "off"
+    },
     "TypeScript": {
       "formatter": {
         "code_actions": {
