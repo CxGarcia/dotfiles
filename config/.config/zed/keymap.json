@@ -11,10 +11,9 @@
     "bindings": {
       "shift-k": "editor::Hover",
       "space d": "diagnostics::Deploy",
-      "space o": "tab_switcher::Toggle",
-      "space e": "workspace::ToggleRightDock",
-      "space /": "workspace::NewSearch",
-      "space f": "workspace::NewCenterTerminal"
+      "space p": "tab_switcher::Toggle",
+      "space o": "outline::Toggle",
+      "space t": "workspace::NewCenterTerminal"
     }
   },
   {
