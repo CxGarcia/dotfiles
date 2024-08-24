@@ -7,6 +7,13 @@
 // custom settings, run `zed: open default settings` from the
 // command palette
 {
+  "assistant": {
+    "default_model": {
+      "provider": "zed.dev",
+      "model": "claude-3-5-sonnet-20240620"
+    },
+    "version": "2"
+  },
   "vim_mode": true,
   "relative_line_numbers": true,
   "ui_font_size": 16,
@@ -46,6 +53,9 @@
           "source.fixAll.eslint": true
         }
       }
+    },
+    "Markdown": {
+      "soft_wrap": "editor_width"
     }
   },
   "terminal": {
