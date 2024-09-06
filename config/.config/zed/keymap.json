@@ -28,6 +28,16 @@
     }
   },
   {
+    "context": "ProjectPanel",
+    "bindings": {
+      "ctrl-w j": ["workspace::ActivatePaneInDirection", "Down"],
+      "ctrl-w k": ["workspace::ActivatePaneInDirection", "Up"],
+      "ctrl-w h": ["workspace::ActivatePaneInDirection", "Left"],
+      "ctrl-w l": ["workspace::ActivatePaneInDirection", "Right"]
+      // "ctrl-k": ["workspace::ActivatePaneInDirection", "Up"]
+    }
+  },
+  {
     "context": "Editor",
     "bindings": {
       // "j k": ["workspace::SendKeystrokes", "escape"]
