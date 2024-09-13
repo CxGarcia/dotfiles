@@ -1,5 +1,8 @@
 {
   "dependencies": {
-    "create-next-app": "^11.1.0"
+    "create-next-app": "^12.1.0",
+    "nx": "^13.9.5",
+    "prisma": "^3.10.0",
+    "svgo": "^2.8.0"
   }
 }

@@ -53,7 +53,6 @@ end)
 hs.notify.new({title="Hammerspoon", informativeText="Config loaded"}):send()
 
 local applicationHotkeys = {
-  c = 'Google Chrome',
   f = 'iTerm',
   v = 'Zed',
   n = 'Obsidian',
@@ -61,12 +60,11 @@ local applicationHotkeys = {
   z = 'zoom.us',
   -- p = "Postman",
   m = "Spotify"
+  c = 'Google Chrome',
 }
 
 for key, app in pairs(applicationHotkeys) do
   hs.hotkey.bind(hyper, key, function()
     hs.application.launchOrFocus(app)
-    local window = hs.application:getWindow(app)
-    hs.mouse.setAbsolutePosition(window)
   end)
 end
