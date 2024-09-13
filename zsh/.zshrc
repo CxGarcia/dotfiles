@@ -128,12 +128,18 @@ autoload bashcompinit
 
 
 
+
+export DEV="$HOME/dev"
+export CXBIN="$DEV/cx-scripts"
+
 export DEV=$HOME/dev
 export GOPATH=$HOME/go
 export GOBIN=$GOPATH/bin
 export NODEBIN=/opt/homebrew/Cellar/node@20/20.14.0/bin
+export CONDABIN=/opt/homebrew/anaconda3/bin
+export MYSQLBIN=/opt/homebrew/opt/mysql-client/bin
 export CXBIN=$HOME/dotfiles/mac/mac-scripts
-export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:/usr/local/sbin"
+export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$CONDABIN:$MYSQLBIN:/usr/local/sbin"
 
 
 #syntax Highlight
@@ -160,15 +166,15 @@ alias nmda="seekndestroy node_modules"
 alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy build; seekndestroy .turbo; seekndestroy turbo;"
 
 ##push sync retropie
-alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.1.183:~/RetroPie/roms/"
+alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
 
 ##zed as default editor
 alias code="zed"
 
 ##ssh
 alias wpcloud="ssh cx@46.101.204.150"
-alias cxcloud="ssh cx159.89.111.58"
-
+alias cxcloud="ssh cx@159.89.111.58"
+alias hotcloud="ssh cx@207.154.201.191"
 #######END-ALIASES#######
 
 source $CXBIN/cdn-completion.zsh
@@ -184,7 +190,30 @@ fpath+=~/.zfunc
 
 compinit
 
-test -d "$HOME/.tea" && source <("$HOME/.tea/tea.xyz/v*/bin/tea" --magic=zsh --silent)
 SPACESHIP_TIME_SHOW=true
 
 eval "$(rbenv init - zsh)"
+
+# bun completions
+[ -s "/Users/cristobalschlaubitz/.bun/_bun" ] && source "/Users/cristobalschlaubitz/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+test -d "$HOME/.tea" && source <("$HOME/.tea/tea.xyz/v*/bin/tea" --magic=zsh --silent)
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/opt/homebrew/anaconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/opt/homebrew/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "/opt/homebrew/anaconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/opt/homebrew/anaconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<

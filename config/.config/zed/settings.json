@@ -46,7 +46,7 @@
     "TypeScript": {
       "formatter": {
         "code_actions": {
-          "source.fixAll.eslint": true
+          "source.organizeImports.biome": true
         }
       }
     },
@@ -56,6 +56,9 @@
           "source.fixAll.eslint": true
         }
       }
+    },
+    "Markdown": {
+      "soft_wrap": "editor_width"
     }
   },
   "terminal": {
