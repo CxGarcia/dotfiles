@@ -73,4 +73,5 @@ web_modules/
 node_modules
 
 # raycast extensions
-/raycast/extensions/*
+config/.config/raycast/extensions/*
+config/.config/raycast/extensions/*
