@@ -192,7 +192,6 @@ compinit
 
 SPACESHIP_TIME_SHOW=true
 
-eval "$(rbenv init - zsh)"
 
 # bun completions
 [ -s "/Users/cristobalschlaubitz/.bun/_bun" ] && source "/Users/cristobalschlaubitz/.bun/_bun"
@@ -201,7 +200,6 @@ eval "$(rbenv init - zsh)"
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-test -d "$HOME/.tea" && source <("$HOME/.tea/tea.xyz/v*/bin/tea" --magic=zsh --silent)
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
