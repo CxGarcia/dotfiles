@@ -135,7 +135,7 @@ export CXBIN="$DEV/cx-scripts"
 export DEV=$HOME/dev
 export GOPATH=$HOME/go
 export GOBIN=$GOPATH/bin
-export NODEBIN=/opt/homebrew/Cellar/node@20/20.14.0/bin
+export NODEBIN="/opt/homebrew/opt/node@20/bin"
 export CONDABIN=/opt/homebrew/anaconda3/bin
 export MYSQLBIN=/opt/homebrew/opt/mysql-client/bin
 export CXBIN=$HOME/dotfiles/mac/mac-scripts
@@ -148,9 +148,6 @@ source $ZSH/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 #starship prompt
 eval "$(starship init zsh)"
-
-#fnm node manager
-eval "$(fnm env)"
 
 #######ALIASES#######
 
@@ -169,7 +166,7 @@ alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy bu
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
 
 ##zed as default editor
-alias code="zed"
+alias code="cursor"
 
 ##ssh
 alias wpcloud="ssh cx@46.101.204.150"
@@ -217,3 +214,72 @@ else
 fi
 unset __conda_setup
 # <<< conda initialize <<<
+###-begin-npm-completion-###
+#
+# npm command completion script
+#
+# Installation: npm completion >> ~/.bashrc  (or ~/.zshrc)
+# Or, maybe: npm completion > /usr/local/etc/bash_completion.d/npm
+#
+
+if type complete &>/dev/null; then
+  _npm_completion () {
+    local words cword
+    if type _get_comp_words_by_ref &>/dev/null; then
+      _get_comp_words_by_ref -n = -n @ -n : -w words -i cword
+    else
+      cword="$COMP_CWORD"
+      words=("${COMP_WORDS[@]}")
+    fi
+
+    local si="$IFS"
+    if ! IFS=$'\n' COMPREPLY=($(COMP_CWORD="$cword" \
+                           COMP_LINE="$COMP_LINE" \
+                           COMP_POINT="$COMP_POINT" \
+                           npm completion -- "${words[@]}" \
+                           2>/dev/null)); then
+      local ret=$?
+      IFS="$si"
+      return $ret
+    fi
+    IFS="$si"
+    if type __ltrim_colon_completions &>/dev/null; then
+      __ltrim_colon_completions "${words[cword]}"
+    fi
+  }
+  complete -o default -F _npm_completion npm
+elif type compdef &>/dev/null; then
+  _npm_completion() {
+    local si=$IFS
+    compadd -- $(COMP_CWORD=$((CURRENT-1)) \
+                 COMP_LINE=$BUFFER \
+                 COMP_POINT=0 \
+                 npm completion -- "${words[@]}" \
+                 2>/dev/null)
+    IFS=$si
+  }
+  compdef _npm_completion npm
+elif type compctl &>/dev/null; then
+  _npm_completion () {
+    local cword line point words si
+    read -Ac words
+    read -cn cword
+    let cword-=1
+    read -l line
+    read -ln point
+    si="$IFS"
+    if ! IFS=$'\n' reply=($(COMP_CWORD="$cword" \
+                       COMP_LINE="$line" \
+                       COMP_POINT="$point" \
+                       npm completion -- "${words[@]}" \
+                       2>/dev/null)); then
+
+      local ret=$?
+      IFS="$si"
+      return $ret
+    fi
+    IFS="$si"
+  }
+  compctl -K _npm_completion npm
+fi
+###-end-npm-completion-###
