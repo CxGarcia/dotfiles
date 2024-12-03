@@ -3,6 +3,6 @@ pushd $DOTFILES
 for folder in $(echo $STOW_FOLDERS | sed "s/,/ /g")
 do
   echo stowing $folder
-  stow --ignore ".DS_Store" --target=$HOME $folder
+  stow --ignore ".DS_Store" --target=$HOME $folder --adopt
 done
 popd
