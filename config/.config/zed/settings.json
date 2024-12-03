@@ -7,12 +7,20 @@
 // custom settings, run `zed: open default settings` from the
 // command palette
 {
+  "show_inline_completions": true,
+  "inline_completions": {
+    "disabled_globs": [".env"]
+  },
   "assistant": {
     "default_model": {
       "provider": "zed.dev",
-      "model": "claude-3-5-sonnet-20240620"
+      "model": "claude-3-5-sonnet-latest"
     },
     "version": "2"
+  },
+  "gutter": {
+    "folds": false,
+    "code_actions": false
   },
   "vim_mode": true,
   "relative_line_numbers": true,
@@ -36,7 +44,7 @@
   "theme": {
     "mode": "system",
     "light": "One Light",
-    "dark": "One Light"
+    "dark": "One Dark"
   },
 
   "languages": {
@@ -46,7 +54,7 @@
     "TypeScript": {
       "formatter": {
         "code_actions": {
-          "source.organizeImports.biome": true
+          "source.fixAll.eslint": true
         }
       }
     },
@@ -58,6 +66,10 @@
       }
     },
     "Markdown": {
+      "soft_wrap": "editor_width"
+    },
+    "SQL": {
+      "show_inline_completions": true,
       "soft_wrap": "editor_width"
     }
   },

@@ -54,13 +54,12 @@ hs.notify.new({title="Hammerspoon", informativeText="Config loaded"}):send()
 
 local applicationHotkeys = {
   f = 'iTerm',
-  v = 'Zed',
+  -- v = 'Zed',
+  v = 'Cursor',
   n = 'Obsidian',
   s = 'Slack',
-  z = 'zoom.us',
-  -- p = "Postman",
-  m = "Spotify"
-  c = 'Google Chrome',
+  m = 'Spotify',
+  c = 'Google Chrome'
 }
 
 for key, app in pairs(applicationHotkeys) do
