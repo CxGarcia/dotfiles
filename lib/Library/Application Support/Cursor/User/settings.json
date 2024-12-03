@@ -1,0 +1,88 @@
+{
+    "workbench.sideBar.location": "right",
+    "workbench.colorTheme": "GitHub Dark",
+    "workbench.editor.enablePreview": false,
+    "editor.fontSize": 14,
+    "editor.fontFamily": "Fira Code",
+    "terminal.integrated.fontSize": 14,
+    "chat.editor.fontFamily": "Fira Code",
+    "editor.lineNumbers": "relative",
+    "vim.useCtrlKeys": true,
+    "vim.incsearch": true,
+    "vim.surround": true,
+    "vim.hlsearch": true,
+    "vim.camelCaseMotion.enable": true,
+    "vim.enableNeovim": true,
+    "vim.leader": "<space>",
+    "vim.easymotion": true,
+    "vim.useSystemClipboard": true,
+    "vim.normalModeKeyBindingsNonRecursive": [
+      {
+        "before": ["g", "]"],
+        "commands": ["editor.action.marker.next"],
+        "silent": true
+      },
+      {
+        "before": ["g", "["],
+        "commands": ["editor.action.marker.prev"],
+        "silent": true
+      },
+      {
+        "before": ["g", "."],
+        "commands": ["editor.action.quickFix"],
+        "silent": true
+      },
+      {
+        "before": ["g", "f"],
+        "commands": ["editor.action.autoFix"]
+      },
+      {
+        "before": ["g", "y"],
+        "commands": ["editor.action.goToTypeDefinition"]
+      },
+      {
+        "before": ["<leader>", "o"],
+        "commands": ["workbench.action.gotoSymbol"],
+        "args": ["-1"],
+      },
+      {
+        "before": ["<leader>", "O"],
+        "commands": ["workbench.action.showAllSymbols"],
+      },
+      {
+        "before": ["g", "A"],
+        "commands": ["editor.action.goToReferences"],
+        "args": ["-1"],
+      },
+      {
+        "before": ["g", "/"],
+        "commands": [
+          "editor.action.addSelectionToNextFindMatch",
+          {
+            "command": "workbench.action.findInFiles",
+            "args": {
+              "query": "${selectedText}",
+              "triggerSearch": true
+            }
+          }
+        ],
+      },
+      {
+        "before": ["<leader>", "d"],
+        "commands": ["workbench.actions.view.problems"],
+        "silent": true
+      },
+      {
+        "before": ["c", "d"],
+        "commands": ["editor.action.rename"]
+      }
+    ],
+    "workbench.activityBar.orientation": "vertical",
+    "security.promptForLocalFileProtocolHandling": false,
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "typescript.tsserver.maxTsServerMemory": 8192,
+    "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@20/bin/node",
+    "gitblame.inlineMessageEnabled": true
+}

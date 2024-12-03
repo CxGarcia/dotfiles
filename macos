@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 if [[ -z $STOW_FOLDERS ]]; then
-    STOW_FOLDERS="config, hammerspoon, zsh"
+    # STOW_FOLDERS="config, hammerspoon, zsh, lib"
+    STOW_FOLDERS="lib"
 fi
 
 if [[ -z $DOTFILES ]]; then
