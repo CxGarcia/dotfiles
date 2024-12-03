@@ -16,6 +16,9 @@ nest_dir="$DEV/nest"
     elif [ "$1" = "commonlib" ]
       then
         cd $nest_dir/packages/commonlib
+    elif [ "$1" = "web" ]
+      then 
+        cd $nest_dir/websites/web
     else
       cd "$nest_dir/apps/$1"
   fi

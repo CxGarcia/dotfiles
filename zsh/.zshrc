@@ -126,20 +126,18 @@ unsetopt PROMPT_SP
 
 autoload bashcompinit
 
-
-
-
 export DEV="$HOME/dev"
 export CXBIN="$DEV/cx-scripts"
 
 export DEV=$HOME/dev
 export GOPATH=$HOME/go
 export GOBIN=$GOPATH/bin
+export BREWBIN=/opt/homebrew/bin
 export NODEBIN="/opt/homebrew/opt/node@20/bin"
 export CONDABIN=/opt/homebrew/anaconda3/bin
 export MYSQLBIN=/opt/homebrew/opt/mysql-client/bin
 export CXBIN=$HOME/dotfiles/mac/mac-scripts
-export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$CONDABIN:$MYSQLBIN:/usr/local/sbin"
+export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$CONDABIN:$MYSQLBIN:$BREWBIN:/usr/local/sbin"
 
 
 #syntax Highlight
