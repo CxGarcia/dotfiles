@@ -133,11 +133,12 @@ export DEV=$HOME/dev
 export GOPATH=$HOME/go
 export GOBIN=$GOPATH/bin
 export BREWBIN=/opt/homebrew/bin
+export LOCALBIN=$HOME/.local/bin
 export NODEBIN="/opt/homebrew/opt/node@20/bin"
-export CONDABIN=/opt/homebrew/anaconda3/bin
 export MYSQLBIN=/opt/homebrew/opt/mysql-client/bin
 export CXBIN=$HOME/dotfiles/mac/mac-scripts
-export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$CONDABIN:$MYSQLBIN:$BREWBIN:/usr/local/sbin"
+export PYTHONBIN=/opt/homebrew/opt/python@3.13/libexec/bin
+export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$MYSQLBIN:$BREWBIN:$PYTHONBIN:$LOCALBIN:/usr/local/sbin"
 
 
 #syntax Highlight
@@ -164,18 +165,21 @@ alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy bu
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
 
 ##zed as default editor
+## alias code="zed"
 alias code="cursor"
 
 ##ssh
 alias wpcloud="ssh cx@46.101.204.150"
 alias cxcloud="ssh cx@159.89.111.58"
 alias hotcloud="ssh cx@207.154.201.191"
+
 #######END-ALIASES#######
 
 source $CXBIN/cdn-completion.zsh
 
 #prevent brew from updating on every install
 export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_CLEANUP=1
 
 #completions
 zstyle :compinstall filename '/Users/cristobalschlaubitz/.zshrc'
@@ -279,3 +283,7 @@ elif type compctl &>/dev/null; then
   compctl -K _npm_completion npm
 fi
 ###-end-npm-completion-###
+
+. /opt/homebrew/opt/asdf/libexec/asdf.sh
+alias python=$PYTHONBIN/python
+alias pip=$PYTHONBIN/pip
