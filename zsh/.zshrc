@@ -133,10 +133,12 @@ export DEV=$HOME/dev
 export GOPATH=$HOME/go
 export GOBIN=$GOPATH/bin
 export BREWBIN=/opt/homebrew/bin
+export LOCALBIN=$HOME/.local/bin
 export NODEBIN="/opt/homebrew/opt/node@20/bin"
 export MYSQLBIN=/opt/homebrew/opt/mysql-client/bin
 export CXBIN=$HOME/dotfiles/mac/mac-scripts
-export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$MYSQLBIN:$BREWBIN:/usr/local/sbin"
+export PYTHONBIN=/opt/homebrew/opt/python@3.13/libexec/bin
+export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$MYSQLBIN:$BREWBIN:$PYTHONBIN:$LOCALBIN:/usr/local/sbin"
 
 #syntax Highlight
 source $ZSH/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
@@ -160,17 +162,19 @@ alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy bu
 ##push sync retropie
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
 
-##zed as default editor
+## alias code="zed"
 alias code="cursor"
 
 ##ssh
 alias wpcloud="ssh cx@46.101.204.150"
 alias cxcloud="ssh cx@159.89.111.58"
 alias hotcloud="ssh cx@207.154.201.191"
+
 #######END-ALIASES#######
 
 #prevent brew from updating on every install
 export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_CLEANUP=1
 
 #completions
 compdef _cdd cdd
@@ -179,15 +183,15 @@ zstyle :compinstall filename '/Users/cristobalschlaubitz/.zshrc'
 
 autoload -Uz compinit
 fpath+=~/.zfunc
+[ -s "/Users/cristobalschlaubitz/.bun/_bun" ] && source "/Users/cristobalschlaubitz/.bun/_bun"
 
 compinit
 
 SPACESHIP_TIME_SHOW=true
 
 
-# bun completions
-[ -s "/Users/cristobalschlaubitz/.bun/_bun" ] && source "/Users/cristobalschlaubitz/.bun/_bun"
-
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
+
+. /opt/homebrew/opt/asdf/libexec/asdf.sh
