@@ -7,6 +7,9 @@
 // custom settings, run `zed: open default settings` from the
 // command palette
 {
+  "features": {
+    "edit_prediction_provider": "zed"
+  },
   "show_inline_completions": true,
   "inline_completions": {
     "disabled_globs": [".env"]
