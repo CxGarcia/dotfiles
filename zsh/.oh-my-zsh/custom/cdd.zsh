@@ -1,11 +1,22 @@
 cdd() {
-  if [ -z "$1" ]
-    then
-      cd "$DEV"
-    else
-      cd "$DEV/$1"
+  local dev_dir="$HOME/dev"
+
+  if [[ $# -eq 0 ]]; then
+    cd "$dev_dir"
+  else
+    cd "$dev_dir/$1"
   fi
 }
+
+# Tab completion for the dev function
+_cdd() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local dev_dir="$HOME/dev"
+
+  # Get all subdirectories in ~/dev
+  _files -W "$dev_dir" -/
+}
+
 
 cdn() {
 nest_dir="$DEV/nest"
@@ -17,7 +28,7 @@ nest_dir="$DEV/nest"
       then
         cd $nest_dir/packages/commonlib
     elif [ "$1" = "web" ]
-      then 
+      then
         cd $nest_dir/websites/web
     else
       cd "$nest_dir/apps/$1"

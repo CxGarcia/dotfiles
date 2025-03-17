@@ -10,8 +10,13 @@
   "features": {
     "edit_prediction_provider": "zed"
   },
+<<<<<<< HEAD
   "show_edit_predictions": true,
   "edit_predictions": {
+=======
+  "show_inline_completions": true,
+  "inline_completions": {
+>>>>>>> 0ac5eb1a8c9118aa14d38ef772856b2539623e90
     "disabled_globs": [".env"]
   },
   "assistant": {
