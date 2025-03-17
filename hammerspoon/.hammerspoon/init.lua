@@ -54,8 +54,9 @@ hs.notify.new({title="Hammerspoon", informativeText="Config loaded"}):send()
 
 local applicationHotkeys = {
   f = 'iTerm',
-  v = 'Zed',
-  -- v = 'Cursor',
+  z = 'Zed Preview',
+  -- v = 'Zed',
+  v = 'Cursor',
   n = 'Obsidian',
   s = 'Slack',
   m = 'Spotify',

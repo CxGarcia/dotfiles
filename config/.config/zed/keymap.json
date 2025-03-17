@@ -30,28 +30,22 @@
   {
     "context": "ProjectPanel",
     "bindings": {
-      "ctrl-w j": ["workspace::ActivatePaneInDirection", "Down"],
-      "ctrl-w k": ["workspace::ActivatePaneInDirection", "Up"],
-      "ctrl-w h": ["workspace::ActivatePaneInDirection", "Left"],
-      "ctrl-w l": ["workspace::ActivatePaneInDirection", "Right"]
-      // "ctrl-k": ["workspace::ActivatePaneInDirection", "Up"]
+      "ctrl-w j": "workspace::ActivatePaneDown",
+      "ctrl-w k": "workspace::ActivatePaneUp",
+      "ctrl-w h": "workspace::ActivatePaneLeft",
+      "ctrl-w l": "workspace::ActivatePaneRight"
     }
   },
   {
-    "context": "Editor",
+    "context": "vim_operator == a || vim_operator == i || vim_operator == cs",
     "bindings": {
-      // "j k": ["workspace::SendKeystrokes", "escape"]
+      "b": "vim::AnyBrackets"
     }
   },
   {
     "context": "vim_mode == visual",
     "bindings": {
-      "shift-s": [
-        "vim::PushOperator",
-        {
-          "AddSurrounds": {}
-        }
-      ]
+      "shift-s": ["vim::PushAddSurrounds", {}]
     }
   }
 ]

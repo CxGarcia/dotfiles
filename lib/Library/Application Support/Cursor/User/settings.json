@@ -1,6 +1,5 @@
 {
     "workbench.sideBar.location": "right",
-    "workbench.colorTheme": "GitHub Dark",
     "workbench.editor.enablePreview": false,
     "editor.fontSize": 14,
     "editor.fontFamily": "Fira Code",
@@ -55,6 +54,14 @@
         "args": ["-1"],
       },
       {
+        "before": ["g", "s"],
+        "commands": ["editor.action.goToSymbol"]
+      },
+      {
+        "before": ["g", "I"],
+        "commands": ["editor.action.goToImplementation"]
+      },
+      {
         "before": ["g", "/"],
         "commands": [
           "editor.action.addSelectionToNextFindMatch",
@@ -83,7 +90,7 @@
       "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
     "typescript.tsserver.maxTsServerMemory": 16000,
-    "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@20/bin/node",
+    "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@22/bin/node",
     "gitblame.inlineMessageEnabled": true,
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
@@ -95,5 +102,9 @@
       "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb",
       "*.mts": "${capture}.typegen.ts",
       "*.cts": "${capture}.typegen.ts"
-    }
+    },
+    "jupyter.askForKernelRestart": false,
+    "cursor.cpp.disabledLanguages": [],
+    "update.releaseTrack": "prerelease",
+    "workbench.colorTheme": "Yitzchok (rainglow)"
 }
