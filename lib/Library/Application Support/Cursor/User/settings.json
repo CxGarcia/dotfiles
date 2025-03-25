@@ -3,6 +3,7 @@
     "workbench.editor.enablePreview": false,
     "editor.fontSize": 14,
     "editor.fontFamily": "Fira Code",
+    "editor.gotoLocation.multipleReferences": "gotoAndPeek",
     "terminal.integrated.fontSize": 14,
     "chat.editor.fontFamily": "Fira Code",
     "editor.lineNumbers": "relative",
@@ -15,6 +16,12 @@
     "vim.leader": "<space>",
     "vim.easymotion": true,
     "vim.useSystemClipboard": true,
+    "vim.neovimUseConfigFile": true,
+    "vim.neovimPath": "/opt/homebrew/bin/nvim",
+    "vim.neovimConfigPath": "/Users/cristobalschlaubitz/.config/nvim/init.lua",
+    "vim.neovimUseCtrlKeys": true,
+    "vim.neovimUseTerminal": true,
+    "vim.neovimUseSmartcase": true,
     "vim.normalModeKeyBindingsNonRecursive": [
       {
         "before": ["g", "]"],
@@ -82,7 +89,28 @@
       {
         "before": ["c", "d"],
         "commands": ["editor.action.rename"]
+      },
+      {
+        "before": ["n"],
+        "commands": ["editor.gotoNextSymbolFromResult"]
+      },
+      {
+        "before": ["n"],
+        "commands": ["editor.action.wordHighlight.next"]
+      },
+      {
+        "before": ["N"],
+        "commands": ["editor.action.wordHighlight.prev"]
+      },
+      {
+        "before": ["<leader>", "p"],
+        "commands": ["workbench.action.quickOpen"]
+      },
+      {
+        "before": ["<leader>", "e"],
+        "commands": ["workbench.action.toggleSidebarVisibility"]
       }
+
     ],
     "workbench.activityBar.orientation": "vertical",
     "security.promptForLocalFileProtocolHandling": false,
