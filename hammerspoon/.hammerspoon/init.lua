@@ -29,11 +29,6 @@ local vAppToggle = {
 menubarIcon = hs.menubar.new()
 
 -- Check if menubar was created successfully
-if menubarIcon then
-    if vAppToggle.currentApp == vAppToggle.apps[1] then
-        menubarIcon:setTitle("🔥")
-    end
-end
 
 -- Function to toggle the app for the 'v' key
 local function toggleVApp()
@@ -51,6 +46,17 @@ local function toggleVApp()
         informativeText = "The 'v' key now launches: " .. vAppToggle.currentApp
     }):send()
 end
+
+if menubarIcon then
+    if vAppToggle.currentApp == vAppToggle.apps[1] then
+        menubarIcon:setTitle("🔥")
+    end
+
+    menubarIcon:setClickCallback(function()
+        toggleVApp()
+    end)
+end
+
 
 hs.hotkey.bind(hyper, "v", function()
     hs.application.launchOrFocus(vAppToggle.currentApp)
