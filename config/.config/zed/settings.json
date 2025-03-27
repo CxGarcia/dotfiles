@@ -10,15 +10,17 @@
   "features": {
     "edit_prediction_provider": "zed"
   },
-  "show_edit_predictions": true,
-  "show_inline_completions": true,
-  "inline_completions": {
+  "editor": {
+    "show_word_completions": true
+  },
+  "edit_predictions": {
+    "show_inline_completions": true,
     "disabled_globs": [".env"]
   },
   "assistant": {
     "default_model": {
       "provider": "zed.dev",
-      "model": "claude-3-5-sonnet-latest"
+      "model": "claude-3-7-sonnet-latest"
     },
     "version": "2",
     "enable_experimental_live_diffs": true
@@ -49,7 +51,7 @@
   "theme": {
     "mode": "system",
     "light": "One Light",
-    "dark": "Anya"
+    "dark": "cx-dark"
   },
 
   "languages": {
@@ -57,17 +59,13 @@
       "format_on_save": "off"
     },
     "TypeScript": {
-      "formatter": {
-        "code_actions": {
-          "source.fixAll.eslint": true
-        }
+      "code_actions_on_format": {
+        "source.organizeImports": true
       }
     },
     "TSX": {
-      "formatter": {
-        "code_actions": {
-          "source.fixAll.eslint": true
-        }
+      "code_actions_on_format": {
+        "source.organizeImports": true
       }
     },
     "Markdown": {
