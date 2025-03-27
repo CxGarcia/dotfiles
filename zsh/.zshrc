@@ -177,7 +177,6 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 
 #completions
-compdef _cdd cdd
 
 zstyle :compinstall filename '/Users/cristobalschlaubitz/.zshrc'
 
@@ -187,8 +186,11 @@ fpath+=~/.zfunc
 
 compinit
 
-SPACESHIP_TIME_SHOW=true
+zstyle :compinstall filename '/Users/cristobalschlaubitz/.zshrc'
+compdef _cdd cdd
 
+# spaceship
+SPACESHIP_TIME_SHOW=true
 
 # bun
 export BUN_INSTALL="$HOME/.bun"

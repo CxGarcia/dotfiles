@@ -1,138 +1,40 @@
 {
-    "workbench.sideBar.location": "right",
-    "workbench.editor.enablePreview": false,
-    "editor.fontSize": 14,
-    "editor.fontFamily": "Fira Code",
-    "editor.gotoLocation.multipleReferences": "gotoAndPeek",
-    "terminal.integrated.fontSize": 14,
-    "chat.editor.fontFamily": "Fira Code",
-    "editor.lineNumbers": "relative",
-    "vim.useCtrlKeys": true,
-    "vim.incsearch": true,
-    "vim.surround": true,
-    "vim.hlsearch": true,
-    "vim.camelCaseMotion.enable": true,
-    "vim.enableNeovim": true,
-    "vim.leader": "<space>",
-    "vim.easymotion": true,
-    "vim.useSystemClipboard": true,
-    "vim.neovimUseConfigFile": true,
-    "vim.neovimPath": "/opt/homebrew/bin/nvim",
-    "vim.neovimConfigPath": "/Users/cristobalschlaubitz/.config/nvim/init.lua",
-    "vim.neovimUseCtrlKeys": true,
-    "vim.neovimUseTerminal": true,
-    "vim.neovimUseSmartcase": true,
-    "vim.normalModeKeyBindingsNonRecursive": [
-      {
-        "before": ["g", "]"],
-        "commands": ["editor.action.marker.next"],
-        "silent": true
-      },
-      {
-        "before": ["g", "["],
-        "commands": ["editor.action.marker.prev"],
-        "silent": true
-      },
-      {
-        "before": ["g", "."],
-        "commands": ["editor.action.quickFix"],
-        "silent": true
-      },
-      {
-        "before": ["g", "f"],
-        "commands": ["editor.action.autoFix"]
-      },
-      {
-        "before": ["g", "y"],
-        "commands": ["editor.action.goToTypeDefinition"]
-      },
-      {
-        "before": ["<leader>", "o"],
-        "commands": ["workbench.action.gotoSymbol"],
-        "args": ["-1"],
-      },
-      {
-        "before": ["<leader>", "O"],
-        "commands": ["workbench.action.showAllSymbols"],
-      },
-      {
-        "before": ["g", "A"],
-        "commands": ["editor.action.goToReferences"],
-        "args": ["-1"],
-      },
-      {
-        "before": ["g", "s"],
-        "commands": ["editor.action.goToSymbol"]
-      },
-      {
-        "before": ["g", "I"],
-        "commands": ["editor.action.goToImplementation"]
-      },
-      {
-        "before": ["g", "/"],
-        "commands": [
-          "editor.action.addSelectionToNextFindMatch",
-          {
-            "command": "workbench.action.findInFiles",
-            "args": {
-              "query": "${selectedText}",
-              "triggerSearch": true
-            }
-          }
-        ],
-      },
-      {
-        "before": ["<leader>", "d"],
-        "commands": ["workbench.actions.view.problems"],
-        "silent": true
-      },
-      {
-        "before": ["c", "d"],
-        "commands": ["editor.action.rename"]
-      },
-      {
-        "before": ["n"],
-        "commands": ["editor.gotoNextSymbolFromResult"]
-      },
-      {
-        "before": ["n"],
-        "commands": ["editor.action.wordHighlight.next"]
-      },
-      {
-        "before": ["N"],
-        "commands": ["editor.action.wordHighlight.prev"]
-      },
-      {
-        "before": ["<leader>", "p"],
-        "commands": ["workbench.action.quickOpen"]
-      },
-      {
-        "before": ["<leader>", "e"],
-        "commands": ["workbench.action.toggleSidebarVisibility"]
-      }
-
-    ],
-    "workbench.activityBar.orientation": "vertical",
-    "security.promptForLocalFileProtocolHandling": false,
-    "[json]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "typescript.tsserver.maxTsServerMemory": 16000,
-    "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@22/bin/node",
-    "gitblame.inlineMessageEnabled": true,
-    "explorer.fileNesting.enabled": true,
-    "explorer.fileNesting.patterns": {
-      "*.ts": "${capture}.js, ${capture}.typegen.ts",
-      "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
-      "*.jsx": "${capture}.js",
-      "*.tsx": "${capture}.ts, ${capture}.typegen.ts",
-      "tsconfig.json": "tsconfig.*.json",
-      "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb",
-      "*.mts": "${capture}.typegen.ts",
-      "*.cts": "${capture}.typegen.ts"
-    },
-    "jupyter.askForKernelRestart": false,
-    "cursor.cpp.disabledLanguages": [],
-    "update.releaseTrack": "prerelease",
-    "workbench.colorTheme": "Yitzchok (rainglow)"
+  "workbench.sideBar.location": "right",
+  "workbench.editor.enablePreview": false,
+  "editor.fontSize": 14,
+  "editor.fontFamily": "Fira Code",
+  "editor.gotoLocation.multipleReferences": "gotoAndPeek",
+  "terminal.integrated.fontSize": 14,
+  "chat.editor.fontFamily": "Fira Code",
+  "editor.lineNumbers": "relative",
+  "vscode-neovim.neovimExecutablePaths.darwin": "/opt/homebrew/bin/nvim",
+  "vscode-neovim.useWSL": false,
+  "workbench.activityBar.orientation": "vertical",
+  "security.promptForLocalFileProtocolHandling": false,
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "typescript.tsserver.maxTsServerMemory": 16000,
+  "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@22/bin/node",
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.ts": "${capture}.js, ${capture}.typegen.ts",
+    "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
+    "*.jsx": "${capture}.js",
+    "*.tsx": "${capture}.ts, ${capture}.typegen.ts",
+    "tsconfig.json": "tsconfig.*.json",
+    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb",
+    "*.mts": "${capture}.typegen.ts",
+    "*.cts": "${capture}.typegen.ts"
+  },
+  "jupyter.askForKernelRestart": false,
+  "cursor.cpp.disabledLanguages": [],
+  "update.releaseTrack": "prerelease",
+  "workbench.colorTheme": "Yitzchok (rainglow)",
+  "extensions.experimental.affinity": {
+    "asvetliakov.vscode-neovim": 1
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
 }
