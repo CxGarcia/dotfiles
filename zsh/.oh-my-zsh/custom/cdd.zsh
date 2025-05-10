@@ -34,15 +34,3 @@ nest_dir="$DEV/nest"
       cd "$nest_dir/apps/$1"
   fi
 }
-
-seekndestroy() {
-  if [ -z "$1" ]
-    then
-      echo "Please provide a file name or directory to delete"
-      return
-  fi
-
-  find . -name "$1" -type d -prune -exec rm -rf '{}' +
-
-  echo "Obliberated all '$1' directories"
-}

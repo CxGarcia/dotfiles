@@ -163,7 +163,7 @@ alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy bu
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
 
 ## alias code="zed"
-alias code="cursor"
+# alias code="cursor"
 
 ##ssh
 alias wpcloud="ssh cx@46.101.204.150"
