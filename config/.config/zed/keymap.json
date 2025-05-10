@@ -7,13 +7,15 @@
 // from the command palette.
 [
   {
-    "context": "Editor && VimControl && !VimWaiting && !menu",
+    "context": "Editor && VimControl && !VimWaiting && !menu && !assistant",
     "bindings": {
       "shift-k": "editor::Hover",
       "space d": "diagnostics::Deploy",
-      "space p": "tab_switcher::Toggle",
+      "space p": "file_finder::Toggle",
       "space o": "outline::Toggle",
-      "space t": "workspace::NewCenterTerminal"
+      "space t": "workspace::NewCenterTerminal",
+      "space e": "workspace::ToggleRightDock",
+      "space a": "assistant::NewChat"
     }
   },
   {
@@ -30,6 +32,7 @@
   {
     "context": "ProjectPanel",
     "bindings": {
+      "space e": "workspace::ToggleRightDock",
       "ctrl-w j": "workspace::ActivatePaneDown",
       "ctrl-w k": "workspace::ActivatePaneUp",
       "ctrl-w h": "workspace::ActivatePaneLeft",
@@ -46,6 +49,12 @@
     "context": "vim_mode == visual",
     "bindings": {
       "shift-s": ["vim::PushAddSurrounds", {}]
+    }
+  },
+  {
+    "context": "Editor && edit_prediction_conflict",
+    "bindings": {
+      "tab": "editor::AcceptEditPrediction"
     }
   }
 ]

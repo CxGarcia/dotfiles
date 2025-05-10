@@ -1,40 +1,130 @@
 {
-  "workbench.sideBar.location": "right",
   "workbench.editor.enablePreview": false,
-  "editor.fontSize": 14,
-  "editor.fontFamily": "Fira Code",
-  "editor.gotoLocation.multipleReferences": "gotoAndPeek",
-  "terminal.integrated.fontSize": 14,
-  "chat.editor.fontFamily": "Fira Code",
-  "editor.lineNumbers": "relative",
-  "vscode-neovim.neovimExecutablePaths.darwin": "/opt/homebrew/bin/nvim",
-  "vscode-neovim.useWSL": false,
-  "workbench.activityBar.orientation": "vertical",
-  "security.promptForLocalFileProtocolHandling": false,
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "typescript.tsserver.maxTsServerMemory": 16000,
-  "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@22/bin/node",
-  "explorer.fileNesting.enabled": true,
-  "explorer.fileNesting.patterns": {
-    "*.ts": "${capture}.js, ${capture}.typegen.ts",
-    "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
-    "*.jsx": "${capture}.js",
-    "*.tsx": "${capture}.ts, ${capture}.typegen.ts",
-    "tsconfig.json": "tsconfig.*.json",
-    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb",
-    "*.mts": "${capture}.typegen.ts",
-    "*.cts": "${capture}.typegen.ts"
-  },
-  "jupyter.askForKernelRestart": false,
-  "cursor.cpp.disabledLanguages": [],
-  "update.releaseTrack": "prerelease",
-  "workbench.colorTheme": "Yitzchok (rainglow)",
-  "extensions.experimental.affinity": {
-    "asvetliakov.vscode-neovim": 1
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+    "editor.fontSize": 14,
+    "editor.fontFamily": "Fira Code",
+    "terminal.integrated.fontSize": 14,
+    "chat.editor.fontFamily": "Fira Code",
+    "editor.lineNumbers": "relative",
+    "vim.useCtrlKeys": true,
+    "vim.incsearch": true,
+    "vim.hlsearch": true,
+    "vim.surround": true,
+    "vim.showMarksInGutter": true,
+    "vim.highlightedyank.enable": true,
+    "vim.highlightedyank.color": "rgba(234, 225, 143, 0.2)",
+    "vim.searchHighlightColor": "rgba(234, 225, 143, 0.4)",
+    "vim.camelCaseMotion.enable": true,
+    "vim.statusBarColors.normal": ["#303942"],
+    "vim.enableNeovim": true,
+    "vim.neovimUseConfigFile": true,
+    "vim.leader": "<space>",
+    "vim.easymotion": true,
+    "vim.useSystemClipboard": true,
+    "vim.normalModeKeyBindingsNonRecursive": [
+      {
+        "before": ["g", "]"],
+        "commands": ["editor.action.marker.next"],
+        "silent": true
+      },
+      {
+        "before": ["g", "["],
+        "commands": ["editor.action.marker.prev"],
+        "silent": true
+      },
+      {
+        "before": ["g", "."],
+        "commands": ["editor.action.quickFix"],
+        "silent": true
+      },
+      {
+        "before": ["g", "f"],
+        "commands": ["editor.action.autoFix"]
+      },
+      {
+        "before": ["g", "y"],
+        "commands": ["editor.action.goToTypeDefinition"]
+      },
+      {
+        "before": ["<leader>", "o"],
+        "commands": ["workbench.action.gotoSymbol"],
+        "args": ["-1"],
+      },
+      {
+        "before": ["<leader>", "O"],
+        "commands": ["workbench.action.showAllSymbols"],
+      },
+      {
+        "before": ["g", "A"],
+        "commands": ["editor.action.goToReferences"],
+        "args": ["-1"],
+      },
+      {
+        "before": ["g", "s"],
+        "commands": ["editor.action.goToSymbol"]
+      },
+      {
+        "before": ["g", "I"],
+        "commands": ["editor.action.goToImplementation"]
+      },
+      {
+        "before": ["g", "/"],
+        "commands": [
+          "editor.action.addSelectionToNextFindMatch",
+          {
+            "command": "workbench.action.findInFiles",
+            "args": {
+              "query": "${selectedText}",
+              "triggerSearch": true
+            }
+          }
+        ],
+      },
+      {
+        "before": ["<leader>", "d"],
+        "commands": ["workbench.actions.view.problems"],
+        "silent": true
+      },
+      {
+        "before": ["c", "d"],
+        "commands": ["editor.action.rename"]
+      }
+    ],
+    "workbench.activityBar.orientation": "vertical",
+    "security.promptForLocalFileProtocolHandling": false,
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "typescript.tsserver.maxTsServerMemory": 32000,
+    "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@22/bin/node",
+    "gitblame.inlineMessageEnabled": true,
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+      "*.ts": "${capture}.js, ${capture}.typegen.ts",
+      "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
+      "*.jsx": "${capture}.js",
+      "*.tsx": "${capture}.ts, ${capture}.typegen.ts",
+      "tsconfig.json": "tsconfig.*.json",
+      "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb",
+      "*.mts": "${capture}.typegen.ts",
+      "*.cts": "${capture}.typegen.ts"
+    },
+    "jupyter.askForKernelRestart": false,
+    "cursor.cpp.disabledLanguages": [],
+    "update.releaseTrack": "prerelease",
+    "workbench.colorTheme": "Yitzchok (rainglow)",
+    "workbench.colorCustomizations": {
+      "statusBar.background": "#434C5E",
+      "statusBar.noFolderBackground": "#434C5E",
+      "statusBar.debuggingBackground": "#434C5E",
+      "statusBar.foreground": "#ffffff",
+      "statusBar.debuggingForeground": "#ffffff"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "javascript.updateImportsOnFileMove.enabled": "never",
+    "editor.accessibilitySupport": "off",
+    "workbench.sideBar.location": "right",
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "python.defaultInterpreterPath": "/Users/cristobalschlaubitz/dev/nest/apps/llmchain/experiments/fluid/.venv"
 }

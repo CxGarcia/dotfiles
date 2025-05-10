@@ -3,14 +3,58 @@ hs.hotkey.bind(hyper, "0", function()
     hs.reload()
 end)
 
--- [Your existing screen navigation code here]
-
+local function mouse_to_next_screen()
+    local screen = hs.mouse.getCurrentScreen()
+    local nextScreen = screen:next()
+    local rect = nextScreen:fullFrame()
+    local center = hs.geometry.rectMidPoint(rect)
+    hs.mouse.setAbsolutePosition(center)
+end
+  
+local function get_window_under_mouse()
+    local my_pos = hs.geometry.new(hs.mouse.getAbsolutePosition())
+    local my_screen = hs.mouse.getCurrentScreen()
+    return hs.fnutils.find(hs.window.orderedWindows(), function(w)
+    return my_screen == w:screen() and my_pos:inside(w:frame())
+    end)
+end
+  
+local function focus_next_screen()
+    mouse_to_next_screen()
+    local win = get_window_under_mouse()
+    win:focus()
+end
+  
+hs.hotkey.bind(hyper, "w", function() -- does the keybinding
+       focus_next_screen()
+end)
+  
+  -- previous screen
+local function mouse_to_prev_screen()
+    local screen = hs.mouse.getCurrentScreen()
+    local prevScreen = screen:previous()
+    local rect = prevScreen:fullFrame()
+    local center = hs.geometry.rectMidPoint(rect)
+    hs.mouse.setAbsolutePosition(center)
+end
+  
+local function focus_prev_screen()
+    mouse_to_prev_screen()
+    local win = get_window_under_mouse()
+    win:focus()
+end
+  
+hs.hotkey.bind(hyper, "q", function() -- does the keybinding
+    focus_prev_screen()
+end)
+  
 -- Application hotkeys
 local applicationHotkeys = {
     f = 'iTerm',
     n = 'Obsidian',
     m = 'Spotify',
-    c = 'Google Chrome'
+    c = 'Google Chrome',
+    s = "Slack"
 }
 
 -- Set up the regular application hotkeys
@@ -20,64 +64,74 @@ for key, app in pairs(applicationHotkeys) do
     end)
 end
 
--- V-app toggle configuration
-local vAppToggle = {
-    currentApp = 'Zed Preview',
-    apps = { 'Zed Preview', 'Cursor' }
+local editorConfigPath = "~/.editor-profile"
+
+local function readEditorConfig()
+    return hs.json.read(editorConfigPath)
+end
+
+local conf = readEditorConfig()
+
+local function updateEditor(editor)
+    conf["editor"] = editor
+
+    hs.json.write(conf, editorConfigPath, true, true)
+end
+
+local editorProps = {
+    { name = "Cursor", icon = "🚀" },
+    { name = "Zed Preview", icon = "🔥" }
 }
 
-menubarIcon = hs.menubar.new()
+local menubarIcon = hs.menubar.new()
 
--- Check if menubar was created successfully
-
--- Function to toggle the app for the 'v' key
-local function toggleVApp()
-    if vAppToggle.currentApp == vAppToggle.apps[1] then
-        menubarIcon:setTitle("🚀")
-        vAppToggle.currentApp = vAppToggle.apps[2]
-    else
-        menubarIcon:setTitle("🔥")
-        vAppToggle.currentApp = vAppToggle.apps[1]
+local function toggleEditor()
+    local nextEditor
+    
+    for _, editor in pairs(editorProps) do
+        if editor.name ~= conf["editor"] then
+            nextEditor = editor
+            break -- Stop after finding the first match
+        end
     end
-
-    print("Application toggled to " .. vAppToggle.currentApp)
-    hs.notify.new({
-        title = "Application Toggled",
-        informativeText = "The 'v' key now launches: " .. vAppToggle.currentApp
-    }):send()
+    
+    updateEditor(nextEditor.name)
+    menubarIcon:setTitle(nextEditor.icon)
 end
 
 if menubarIcon then
-    if vAppToggle.currentApp == vAppToggle.apps[1] then
-        menubarIcon:setTitle("🔥")
+    for _, editor in pairs(editorProps) do
+        if editor.name == conf["editor"] then
+            menubarIcon:setTitle(editor.icon)
+        end
     end
 
     menubarIcon:setClickCallback(function()
-        toggleVApp()
+        toggleEditor()
     end)
 end
 
 
 hs.hotkey.bind(hyper, "v", function()
-    hs.application.launchOrFocus(vAppToggle.currentApp)
+    hs.application.launchOrFocus(conf["editor"])
 end)
 
--- Double press detection for the 'v' key
-local lastVPressTime = 0
+-- Double press detection for the 'x' key
+local lastPressTime = 0
 local doublePressTimeThreshold = 0.5 -- seconds
 
 
--- Set up the 'v' hotkey with double-press detection
+-- Set up the 'x' hotkey with double-press detection
 hs.hotkey.bind(hyper, "x", function()
     local currentTime = hs.timer.secondsSinceEpoch()
-    local timeSinceLastPress = currentTime - lastVPressTime
+    local timeSinceLastPress = currentTime - lastPressTime
 
     if timeSinceLastPress < doublePressTimeThreshold then
         -- Double press detected - toggle the app
-        toggleVApp()
-        lastVPressTime = 0 -- Reset the timer
+        toggleEditor()
+        lastPressTime = 0 -- Reset the timer
     else
-        lastVPressTime = currentTime
+        lastPressTime = currentTime
     end
 end)
 
