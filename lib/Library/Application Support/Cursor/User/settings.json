@@ -126,5 +126,9 @@
     "editor.accessibilitySupport": "off",
     "workbench.sideBar.location": "right",
     "typescript.updateImportsOnFileMove.enabled": "always",
-    "python.defaultInterpreterPath": "/Users/cristobalschlaubitz/dev/nest/apps/llmchain/experiments/fluid/.venv"
+    "python.defaultInterpreterPath": "/Users/cristobalschlaubitz/dev/nest/apps/llmchain/experiments/fluid/.venv",
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "explorer.confirmDelete": false
 }

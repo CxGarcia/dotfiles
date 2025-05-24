@@ -159,6 +159,8 @@ alias nmda="seekndestroy node_modules"
 
 alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy build; seekndestroy .turbo; seekndestroy turbo;"
 
+alias gprs="gh-open -p"
+
 ##push sync retropie
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
 
@@ -197,3 +199,8 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 . /opt/homebrew/opt/asdf/libexec/asdf.sh
+
+. "$HOME/.atuin/bin/env"
+
+eval "$(atuin init zsh)"
+eval "$(atuin init zsh)"

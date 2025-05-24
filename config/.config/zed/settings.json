@@ -59,11 +59,17 @@
       "format_on_save": "off"
     },
     "TypeScript": {
+      "code_actions_on_save": {
+        "source.fixAll.eslint": true
+      },
       "code_actions_on_format": {
         "source.organizeImports": true
       }
     },
     "TSX": {
+      "code_actions": {
+        "source.fixAll.eslint": true
+      },
       "code_actions_on_format": {
         "source.organizeImports": true
       }

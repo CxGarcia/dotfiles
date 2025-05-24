@@ -15,7 +15,7 @@
       "space o": "outline::Toggle",
       "space t": "workspace::NewCenterTerminal",
       "space e": "workspace::ToggleRightDock",
-      "space a": "assistant::NewChat"
+      "space a": "agent::NewThread"
     }
   },
   {
