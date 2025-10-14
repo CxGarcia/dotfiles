@@ -54,7 +54,7 @@ local applicationHotkeys = {
     n = 'Obsidian',
     m = 'Spotify',
     c = 'Google Chrome',
-    -- s = "Slack"
+    s = "Slack"
 }
 
 -- Set up the regular application hotkeys
@@ -136,5 +136,162 @@ hs.hotkey.bind(hyper, "x", function()
 end)
 
 
+
+-- Load and configure Cherry pomodoro timer
+hs.loadSpoon("Cherry")
+spoon.Cherry.work_period_sec = 25 * 60  -- 25 minutes
+spoon.Cherry.rest_period_sec = 5 * 60   -- 5 minute break
+
+-- Track timer state and disabled hotkeys
+local timerActive = false
+local disabledHotkeys = {}
+local pomodoroMonitor = nil
+
+-- Keys to disable during pomodoro for focus (derived from applicationHotkeys)
+local focusModeDisabledKeys = {
+    "s",  -- Slack - social/chat apps
+    "m",  -- Spotify - entertainment apps
+    -- "c", -- Uncomment to disable Chrome during focus
+    -- Add more distracting app keys here as needed
+}
+
+-- Derive the disabled apps from the main applicationHotkeys definition
+local focusModeDisabledApps = {}
+for _, key in ipairs(focusModeDisabledKeys) do
+    if applicationHotkeys[key] then
+        focusModeDisabledApps[key] = applicationHotkeys[key]
+    end
+end
+
+-- Function to disable specific hotkeys during pomodoro
+local function disableHotkeys()
+    timerActive = true
+    
+    -- Disable specified hotkeys during focus mode
+    for key, appName in pairs(focusModeDisabledApps) do
+        local blockedHotkey = hs.hotkey.bind(hyper, key, function()
+            hs.alert.show("🍅 Focus time! " .. appName .. " disabled during pomodoro")
+        end)
+        disabledHotkeys[key] = blockedHotkey
+    end
+    
+    local disabledApps = {}
+    for _, appName in pairs(focusModeDisabledApps) do
+        table.insert(disabledApps, appName)
+    end
+    
+    hs.alert.show("🍅 Pomodoro started! " .. table.concat(disabledApps, ", ") .. " disabled for focus")
+end
+
+-- Function to re-enable hotkeys after pomodoro
+local function onFocusEnd()
+    timerActive = false
+    -- Stop monitoring timer
+    if pomodoroMonitor then
+        pomodoroMonitor:stop()
+        pomodoroMonitor = nil
+    end
+    
+    -- Clean up disabled hotkey bindings
+    for key, hotkey in pairs(disabledHotkeys) do
+        if hotkey then
+            hotkey:delete()
+        end
+    end
+    disabledHotkeys = {}
+    
+    -- Restore original hotkeys for the disabled apps
+    for key, appName in pairs(focusModeDisabledApps) do
+        hs.hotkey.bind(hyper, key, function()
+            hs.application.launchOrFocus(appName)
+        end)
+    end
+    
+    hs.alert.show("✅ Pomodoro complete! Hotkeys re-enabled")
+end
+
+-- Function to check if Cherry timer is still running
+local function isPomodoroRunning()
+    -- Check if Cherry spoon has an active menubar item (typical indicator it's running)
+    if spoon.Cherry.menubar then
+        return true
+    end
+    
+    -- Also check if there's a timer object that's still running
+    if spoon.Cherry.timer and spoon.Cherry.timer:running() then
+        return true
+    end
+    
+    return false
+end
+
+-- Monitor pomodoro status and re-enable hotkeys if stopped early
+local function startPomodoroMonitoring()
+    if pomodoroMonitor then
+        pomodoroMonitor:stop()
+    end
+    
+    pomodoroMonitor = hs.timer.doEvery(2, function()
+        if timerActive and not isPomodoroRunning() then
+            onFocusEnd()
+        end
+    end)
+end
+
+-- Override Cherry's popup method to handle hotkey re-enabling
+local originalPopup = spoon.Cherry.popup
+spoon.Cherry.popup = function(self)
+    originalPopup(self)
+    if timerActive then
+        onFocusEnd()
+    end
+end
+
+-- Double press detection for the 'p' key (pomodoro)
+local lastPomodoroPress = 0
+local pomodoroDoublePressThreshold = 0.5 -- seconds
+
+hs.hotkey.bind(hyper, "p", function()
+    local currentTime = hs.timer.secondsSinceEpoch()
+    local timeSinceLastPress = currentTime - lastPomodoroPress
+    
+    if timeSinceLastPress < pomodoroDoublePressThreshold then
+        -- Double press detected - start pomodoro
+        if not timerActive then
+            disableHotkeys()
+            spoon.Cherry:start()
+            startPomodoroMonitoring()  -- Start monitoring for early stops
+        else
+            hs.alert.show("🍅 Pomodoro already running!")
+        end
+        lastPomodoroPress = 0 -- Reset the timer
+    else
+        lastPomodoroPress = currentTime
+    end
+end)
+
+-- Cleanup function for reloads/shutdowns
+local function cleanup()
+    if pomodoroMonitor then
+        pomodoroMonitor:stop()
+        pomodoroMonitor = nil
+    end
+    -- Re-enable any disabled hotkeys during shutdown/reload
+    if timerActive then
+        -- Clean up disabled hotkey bindings
+        for key, hotkey in pairs(disabledHotkeys) do
+            if hotkey then
+                hotkey:delete()
+            end
+        end
+        disabledHotkeys = {}
+        timerActive = false
+        
+        hs.alert.show("🔄 Config reloaded - Pomodoro hotkeys restored")
+    end
+end
+
+-- Register cleanup on reload/shutdown
+hs.shutdownCallback = cleanup
 
 hs.notify.new({ title = "Hammerspoon", informativeText = "Config loaded" }):send()

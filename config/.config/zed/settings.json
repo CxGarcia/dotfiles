@@ -59,26 +59,21 @@
       "format_on_save": "off"
     },
     "TypeScript": {
-      "code_actions_on_save": {
-        "source.fixAll.eslint": true
-      },
+      "format_on_save": "on",
       "code_actions_on_format": {
-        "source.organizeImports": true
+        "source.fixAll.eslint": true
       }
     },
     "TSX": {
-      "code_actions": {
-        "source.fixAll.eslint": true
+      "format_on_save": "on",
+      "jsx_tag_auto_close": {
+        "enabled": true
       },
       "code_actions_on_format": {
-        "source.organizeImports": true
+        "source.fixAll.eslint": true
       }
     },
     "Markdown": {
-      "soft_wrap": "editor_width"
-    },
-    "SQL": {
-      "show_edit_predictions": true,
       "soft_wrap": "editor_width"
     }
   },

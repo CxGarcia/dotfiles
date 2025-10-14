@@ -1,0 +1,48 @@
+name: go/base
+description: Base workflow for all Go projects
+
+inputs:
+  base_image:
+    type: string
+    description: Base image to use for the runtime container
+
+stages:
+  - name: setup
+    description: Initialize workspace and install dependencies
+    steps:
+      - name: Create git worktree
+        action: git/worktree
+        with:
+          base_branch: ${{ git.base_branch }}
+          branch_prefix: feat/
+          
+  - name: implement
+    description: Execute main agent work
+    timeout: 30m
+    steps:
+      - name: Run agent implementation
+        action: cursor/agent
+        with:
+          model: sonnet-4.5-thinking
+        handlers:
+          on_done:
+            - name: build
+              run: make build
+          on_approve:
+            - name: Commit changes
+              action: git/commit
+              with:
+                message: "feat: ${{ workflow.task }}"
+            - name: Merge worktree
+              action: git/merge
+              with:
+                message: "feat: ${{ workflow.task }}"
+            - name: Delete worktree
+              action: git/worktree
+              with:
+                action: remove
+          on_reject:
+            - name: Delete worktree
+              action: git/worktree
+              with:
+                action: remove

@@ -1,67 +1,35 @@
+// Place your key bindings in this file to override the defaults
 [
-  {
-    "key": "g ]",
-    "command": "editor.action.marker.next",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g [",
-    "command": "editor.action.marker.prev",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g .",
-    "command": "editor.action.quickFix",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g f",
-    "command": "editor.action.autoFix",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g y",
-    "command": "editor.action.goToTypeDefinition",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "space o",
-    "command": "workbench.action.showAllSymbols",
-    "when": "editorTextFocus && neovim.mode == normal"
-  },
-  {
-    "key": "g d",
-    "command": "editor.action.goToDeclaration",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g shift+a",
-    "command": "editor.action.goToReferences",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g s",
-    "command": "editor.action.goToSymbol",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "g shift+i",
-    "command": "editor.action.goToImplementation",
-    "when": "neovim.mode == normal"
-  },
-  {
-    "key": "space d",
-    "command": "workbench.actions.view.problems",
-    "when": "editorTextFocus && neovim.mode == normal"
-  },
-  {
-    "key": "space e",
-    "command": "workbench.action.toggleSidebarVisibility",
-    "when": "editorTextFocus && neovim.mode == normal"
-  },
-  {
-    "key": "space p",
-    "command": "workbench.action.quickOpen",
-    "when": "editorTextFocus && neovim.mode == normal"
-  }
+    {
+        "key": "enter",
+        "commands": [
+            "search.action.viewAsTree",
+            "search.action.focusSearchList",
+        ],
+        "when": "searchViewletFocus"
+    },
+    {
+        "key": "escape",
+        "command": "search.action.focusSearchFromResults",
+        "when": "searchViewletFocus"
+    },
+    {
+        "key": "cmd+enter",
+        "command": "renameFile",
+        "when": "explorerViewletVisible && filesExplorerFocus"
+    },
+    {
+        "key": "enter",
+        "command": "-renameFile",
+        "when": "explorerViewletVisible && filesExplorerFocus"
+    },
+    {
+        "key": "enter",
+        "command": "list.select",
+        "when": "listFocus && !inputFocus"
+    },
+    {
+        "key": "ctrl+w",
+        "command": "-workbench.action.switchWindow"
+    }
 ]

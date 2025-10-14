@@ -87,6 +87,14 @@
       {
         "before": ["c", "d"],
         "commands": ["editor.action.rename"]
+      },
+      {
+        "before": ["]", "c"],
+        "commands": ["workbench.action.editor.nextChange"]
+      },
+      {
+        "before": ["[", "c"],
+        "commands": ["workbench.action.editor.previousChange"]
       }
     ],
     "workbench.activityBar.orientation": "vertical",
@@ -95,7 +103,7 @@
       "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
     "typescript.tsserver.maxTsServerMemory": 32000,
-    "typescript.tsserver.nodePath": "/opt/homebrew/opt/node@22/bin/node",
+    "typescript.tsserver.nodePath": "/Users/cristobalschlaubitz/.asdf/shims/node",
     "gitblame.inlineMessageEnabled": true,
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
@@ -122,13 +130,19 @@
     "[typescript]": {
       "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "javascript.updateImportsOnFileMove.enabled": "never",
-    "editor.accessibilitySupport": "off",
-    "workbench.sideBar.location": "right",
-    "typescript.updateImportsOnFileMove.enabled": "always",
-    "python.defaultInterpreterPath": "/Users/cristobalschlaubitz/dev/nest/apps/llmchain/experiments/fluid/.venv",
     "[typescriptreact]": {
       "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "explorer.confirmDelete": false
+    "editor.accessibilitySupport": "off",
+    "workbench.sideBar.location": "right",
+    "python.defaultInterpreterPath": "/Users/cristobalschlaubitz/dev/nest/apps/llmchain/experiments/fluid/.venv",
+    "explorer.confirmDelete": false,
+    "cursor.composer.shouldChimeAfterChatFinishes": true,
+    "go.toolsManagement.autoUpdate": true,
+    "typescript.experimental.useTsgo": false,
+    "[html]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "cursor.enable_git_worktrees_setting": true,
+    "cursor.agent_layout_browser_beta_setting": true
 }

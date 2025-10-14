@@ -74,7 +74,7 @@ export ZSH="/Users/cristobalschlaubitz/.oh-my-zsh"
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 
-plugins=(git)
+plugins=(git fzf)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -159,7 +159,7 @@ alias nmda="seekndestroy node_modules"
 
 alias destroynode="seekndestroy node_modules; seekndestroy dist; seekndestroy build; seekndestroy .turbo; seekndestroy turbo;"
 
-alias gprs="gh-open -p"
+alias gprs="gho -p"
 
 ##push sync retropie
 alias retropush="rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
@@ -200,7 +200,6 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 . /opt/homebrew/opt/asdf/libexec/asdf.sh
 
-. "$HOME/.atuin/bin/env"
+export GOTOOLCHAIN=auto
 
-eval "$(atuin init zsh)"
-eval "$(atuin init zsh)"
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
