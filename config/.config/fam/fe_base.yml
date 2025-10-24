@@ -7,9 +7,6 @@ inputs:
     description: Port to run the dev server on
     default: "3000"
 
-env:
-  NODE_ENV: development
-
 stages:
   - name: setup
     description: Initialize workspace and install dependencies
@@ -19,11 +16,6 @@ stages:
         with:
           base_branch: ${{ git.base_branch }}
           branch_prefix: feat/
-          
-  - name: implement
-    description: Execute main agent work
-    timeout: 30m
-    steps:
       - name: Run agent implementation
         action: cursor/agent
         with:
@@ -36,11 +28,9 @@ stages:
                 message: "feat: ${{ workflow.task }}"
             - name: Merge worktree
               action: git/merge
-            - name: Delete worktree
-              action: git/worktree
               with:
-                action: remove
-          on_reject:
+                base_branch: ${{ git.current_branch }}
+                message: "Merge ${{ git.branch }} into ${{ git.current_branch }}"
             - name: Delete worktree
               action: git/worktree
               with:

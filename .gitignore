@@ -76,3 +76,4 @@ node_modules
 config/.config/raycast/extensions/*
 config/.config/raycast/extensions/*
 config/.config/zed/prompts/
+config/.config/karabiner/automatic_backups/karabiner*

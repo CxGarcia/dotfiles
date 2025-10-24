@@ -22,7 +22,9 @@ stages:
     steps:
       - name: Run agent implementation
         action: cursor/agent
+        # action: claude/agent
         with:
+          # model: claude-sonnet-4-5-20250929
           model: sonnet-4.5-thinking
         handlers:
           on_done:

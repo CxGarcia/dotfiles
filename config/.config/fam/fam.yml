@@ -5,18 +5,18 @@ projects:
   - name: web
     path: ~/dev/nest/websites/web
     workflow_path: fe_base.yml
-  - name: mock
-    path: ~/dev/fam
-    workflow_path: mock.yml
-  - name: test-approval
-    path: ~/dev/fam
-    workflow_path: /Users/cristobalschlaubitz/dev/fam/testutils/fixtures/test-approval.yml
+  - name: curr
+    path: ${{ system.cwd }}
+    workflow_path: go_base.yml
   - name: test-telegram
     path: ~/dev/fam
     workflow_path: /Users/cristobalschlaubitz/dev/fam/testutils/fixtures/test-telegram-simple.yml
-
 daemon:
   log_level: info
   max_concurrent_workflows: 20
   shutdown_timeout: 30s
   health_check_interval: 30s
+tui:
+  commands:
+    ide: zsh -i -c "code {dir}"
+    terminal: open -a iTerm {dir}
