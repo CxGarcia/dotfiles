@@ -1,0 +1,83 @@
+-- Treesitter - Better syntax highlighting and text objects
+return {
+    "nvim-treesitter/nvim-treesitter",
+    build = ":TSUpdate",
+    event = { "BufReadPost", "BufNewFile" },
+    dependencies = {
+        "nvim-treesitter/nvim-treesitter-textobjects",
+        "RRethy/nvim-treesitter-textsubjects"
+    },
+    config = function()
+        require("nvim-treesitter.configs").setup({
+            ensure_installed = {
+                "lua", "vim", "vimdoc", "typescript", "tsx", 
+                "javascript", "go", "python", "rust", "html",
+                "css", "json", "yaml", "markdown", "bash"
+            },
+            highlight = {
+                enable = true,
+                additional_vim_regex_highlighting = false
+            },
+            indent = { enable = true },
+            incremental_selection = {
+                enable = true,
+                keymaps = {
+                    init_selection = "<C-space>",
+                    node_incremental = "<C-space>",
+                    scope_incremental = false,
+                    node_decremental = "<bs>"
+                }
+            },
+            textobjects = {
+                select = {
+                    enable = true,
+                    lookahead = true,
+                    keymaps = {
+                        -- Functions
+                        ["af"] = "@function.outer",
+                        ["if"] = "@function.inner",
+                        -- Classes
+                        ["ac"] = "@class.outer",
+                        ["ic"] = "@class.inner",
+                        -- Blocks
+                        ["ab"] = "@block.outer",
+                        ["ib"] = "@block.inner",
+                        -- Parameters/arguments
+                        ["aa"] = "@parameter.outer",
+                        ["ia"] = "@parameter.inner",
+                        -- Conditionals
+                        ["ai"] = "@conditional.outer",
+                        ["ii"] = "@conditional.inner",
+                        -- Loops
+                        ["al"] = "@loop.outer",
+                        ["il"] = "@loop.inner"
+                    }
+                },
+                move = {
+                    enable = true,
+                    set_jumps = true,
+                    goto_next_start = {
+                        ["]f"] = "@function.outer",
+                        ["]c"] = "@class.outer",
+                        ["]a"] = "@parameter.inner"
+                    },
+                    goto_next_end = {
+                        ["]F"] = "@function.outer",
+                        ["]C"] = "@class.outer"
+                    },
+                    goto_previous_start = {
+                        ["[f"] = "@function.outer",
+                        ["[c"] = "@class.outer",
+                        ["[a"] = "@parameter.inner"
+                    },
+                    goto_previous_end = {
+                        ["[F"] = "@function.outer",
+                        ["[C"] = "@class.outer"
+                    }
+                }
+            }
+        })
+    end
+}
+
+
