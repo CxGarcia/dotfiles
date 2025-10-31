@@ -2,15 +2,9 @@ projects:
   - name: fam
     path: ~/dev/fam
     workflow_path: go_base.yml
-  - name: web
-    path: ~/dev/nest/websites/web
+  - name: nutria
+    path: ~/dev/nutria
     workflow_path: fe_base.yml
-  - name: curr
-    path: ${{ system.cwd }}
-    workflow_path: go_base.yml
-  - name: test-telegram
-    path: ~/dev/fam
-    workflow_path: /Users/cristobalschlaubitz/dev/fam/testutils/fixtures/test-telegram-simple.yml
 daemon:
   log_level: info
   max_concurrent_workflows: 20
@@ -20,3 +14,5 @@ tui:
   commands:
     ide: zsh -i -c "code {dir}"
     terminal: open -a iTerm {dir}
+agent:
+  default_provider: claude

@@ -15,17 +15,17 @@ stages:
         with:
           base_branch: ${{ git.base_branch }}
           branch_prefix: feat/
-          
+
   - name: implement
     description: Execute main agent work
     timeout: 30m
     steps:
       - name: Run agent implementation
-        action: cursor/agent
-        # action: claude/agent
+        # action: cursor/agent
+        action: claude/agent
         with:
-          # model: claude-sonnet-4-5-20250929
-          model: sonnet-4.5-thinking
+          model: claude-sonnet-4-5-20250929
+          # model: sonnet-4.5-thinking
         handlers:
           on_done:
             - name: build
@@ -34,11 +34,12 @@ stages:
             - name: Commit changes
               action: git/commit
               with:
-                message: "feat: ${{ workflow.task }}"
+                message: 'feat: ${{ workflow.task }}'
             - name: Merge worktree
-              action: git/merge
+              action: git/merge-worktree
               with:
-                message: "feat: ${{ workflow.task }}"
+                base_branch: ${{ git.current_branch }}
+                message: 'Merge ${{ git.branch }} into ${{ git.current_branch }}'
             - name: Delete worktree
               action: git/worktree
               with:

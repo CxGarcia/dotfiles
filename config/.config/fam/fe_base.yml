@@ -1,12 +1,6 @@
 name: frontend-feature
 description: Full frontend feature development workflow with preview
 
-inputs:
-  port:
-    type: string
-    description: Port to run the dev server on
-    default: "3000"
-
 stages:
   - name: setup
     description: Initialize workspace and install dependencies
@@ -17,20 +11,18 @@ stages:
           base_branch: ${{ git.base_branch }}
           branch_prefix: feat/
       - name: Run agent implementation
-        action: cursor/agent
-        with:
-          model: sonnet-4.5-thinking
+        action: agent
         handlers:
           on_approve:
             - name: Commit changes
               action: git/commit
               with:
-                message: "feat: ${{ workflow.task }}"
+                message: 'feat: ${{ workflow.task }}'
             - name: Merge worktree
-              action: git/merge
+              action: git/merge-worktree
               with:
-                base_branch: ${{ git.current_branch }}
-                message: "Merge ${{ git.branch }} into ${{ git.current_branch }}"
+                base_branch: ${{ git.project.current_branch }}
+                message: 'Merge ${{ git.branch }} into ${{ git.project.current_branch }}'
             - name: Delete worktree
               action: git/worktree
               with:
