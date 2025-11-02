@@ -10,7 +10,7 @@ local function mouse_to_next_screen()
     local center = hs.geometry.rectMidPoint(rect)
     hs.mouse.setAbsolutePosition(center)
 end
-  
+
 local function get_window_under_mouse()
     local my_pos = hs.geometry.new(hs.mouse.getAbsolutePosition())
     local my_screen = hs.mouse.getCurrentScreen()
@@ -18,17 +18,17 @@ local function get_window_under_mouse()
     return my_screen == w:screen() and my_pos:inside(w:frame())
     end)
 end
-  
+
 local function focus_next_screen()
     mouse_to_next_screen()
     local win = get_window_under_mouse()
     win:focus()
 end
-  
+
 hs.hotkey.bind(hyper, "w", function() -- does the keybinding
        focus_next_screen()
 end)
-  
+
   -- previous screen
 local function mouse_to_prev_screen()
     local screen = hs.mouse.getCurrentScreen()
@@ -37,24 +37,24 @@ local function mouse_to_prev_screen()
     local center = hs.geometry.rectMidPoint(rect)
     hs.mouse.setAbsolutePosition(center)
 end
-  
+
 local function focus_prev_screen()
     mouse_to_prev_screen()
     local win = get_window_under_mouse()
     win:focus()
 end
-  
+
 hs.hotkey.bind(hyper, "q", function() -- does the keybinding
     focus_prev_screen()
 end)
-  
+
 -- Application hotkeys
 local applicationHotkeys = {
     f = 'iTerm',
     n = 'Obsidian',
     m = 'Spotify',
     c = 'Google Chrome',
-    s = "Slack"
+    -- s = "Slack"
 }
 
 -- Set up the regular application hotkeys
@@ -87,14 +87,14 @@ local menubarIcon = hs.menubar.new()
 
 local function toggleEditor()
     local nextEditor
-    
+
     for _, editor in pairs(editorProps) do
         if editor.name ~= conf["editor"] then
             nextEditor = editor
             break -- Stop after finding the first match
         end
     end
-    
+
     updateEditor(nextEditor.name)
     menubarIcon:setTitle(nextEditor.icon)
 end
@@ -166,7 +166,7 @@ end
 -- Function to disable specific hotkeys during pomodoro
 local function disableHotkeys()
     timerActive = true
-    
+
     -- Disable specified hotkeys during focus mode
     for key, appName in pairs(focusModeDisabledApps) do
         local blockedHotkey = hs.hotkey.bind(hyper, key, function()
@@ -174,12 +174,12 @@ local function disableHotkeys()
         end)
         disabledHotkeys[key] = blockedHotkey
     end
-    
+
     local disabledApps = {}
     for _, appName in pairs(focusModeDisabledApps) do
         table.insert(disabledApps, appName)
     end
-    
+
     hs.alert.show("🍅 Pomodoro started! " .. table.concat(disabledApps, ", ") .. " disabled for focus")
 end
 
@@ -191,7 +191,7 @@ local function onFocusEnd()
         pomodoroMonitor:stop()
         pomodoroMonitor = nil
     end
-    
+
     -- Clean up disabled hotkey bindings
     for key, hotkey in pairs(disabledHotkeys) do
         if hotkey then
@@ -199,14 +199,14 @@ local function onFocusEnd()
         end
     end
     disabledHotkeys = {}
-    
+
     -- Restore original hotkeys for the disabled apps
     for key, appName in pairs(focusModeDisabledApps) do
         hs.hotkey.bind(hyper, key, function()
             hs.application.launchOrFocus(appName)
         end)
     end
-    
+
     hs.alert.show("✅ Pomodoro complete! Hotkeys re-enabled")
 end
 
@@ -216,12 +216,12 @@ local function isPomodoroRunning()
     if spoon.Cherry.menubar then
         return true
     end
-    
+
     -- Also check if there's a timer object that's still running
     if spoon.Cherry.timer and spoon.Cherry.timer:running() then
         return true
     end
-    
+
     return false
 end
 
@@ -230,7 +230,7 @@ local function startPomodoroMonitoring()
     if pomodoroMonitor then
         pomodoroMonitor:stop()
     end
-    
+
     pomodoroMonitor = hs.timer.doEvery(2, function()
         if timerActive and not isPomodoroRunning() then
             onFocusEnd()
@@ -254,7 +254,7 @@ local pomodoroDoublePressThreshold = 0.5 -- seconds
 hs.hotkey.bind(hyper, "p", function()
     local currentTime = hs.timer.secondsSinceEpoch()
     local timeSinceLastPress = currentTime - lastPomodoroPress
-    
+
     if timeSinceLastPress < pomodoroDoublePressThreshold then
         -- Double press detected - start pomodoro
         if not timerActive then
@@ -286,7 +286,7 @@ local function cleanup()
         end
         disabledHotkeys = {}
         timerActive = false
-        
+
         hs.alert.show("🔄 Config reloaded - Pomodoro hotkeys restored")
     end
 end

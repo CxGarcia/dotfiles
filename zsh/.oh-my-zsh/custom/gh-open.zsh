@@ -25,6 +25,7 @@ gho() {
   open "$url"
 }
 
+unalias gpr 2>/dev/null
 gpr() {
   local current_branch=$(git branch --show-current 2>/dev/null)
   
