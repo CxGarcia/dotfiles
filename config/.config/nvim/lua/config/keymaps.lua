@@ -45,4 +45,4 @@ keymap("n", "<leader>bd", "<cmd>bdelete<CR>", { desc = "Delete buffer" })
 -- Search across all files
 keymap("n", "g/", "<cmd>Telescope live_grep<CR>", { desc = "Search across all files" })
 
-
+keymap("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Toggle Claude Code" })
