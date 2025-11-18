@@ -1,4 +1,4 @@
--- Keymaps
+-- Keymapskey
 local keymap = vim.keymap.set
 
 -- Better window navigation
@@ -44,5 +44,6 @@ keymap("n", "<leader>bd", "<cmd>bdelete<CR>", { desc = "Delete buffer" })
 
 -- Search across all files
 keymap("n", "g/", "<cmd>Telescope live_grep<CR>", { desc = "Search across all files" })
+keymap("n", "<leader>k", "<cmd>Telescope project<CR>", { desc = "Search across all files" })
 
 keymap("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Toggle Claude Code" })

@@ -65,6 +65,14 @@ return {
                     -- Use fd for much faster file finding (install with: brew install fd)
                     find_command = { "fd", "--type", "f", "--strip-cwd-prefix", "--hidden", "--exclude", ".git" }
                 }
+            },
+            extensions = {
+                project = {
+                    base_dirs = {
+                        vim.fn.expand("~/dev"),
+                    },
+                    sync_with_nvim_tree = true,
+                }
             }
         })
 
