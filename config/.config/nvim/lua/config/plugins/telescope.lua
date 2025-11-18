@@ -54,7 +54,10 @@ return {
                     i = {
                         ["<C-j>"] = actions.move_selection_next,
                         ["<C-k>"] = actions.move_selection_previous,
-                        ["<C-q>"] = actions.send_selected_to_qflist + actions.open_qflist,
+                        ["<C-q>"] = function(prompt_bufnr)
+                            actions.send_selected_to_qflist(prompt_bufnr)
+                            actions.open_qflist(prompt_bufnr)
+                        end,
                         ["<Esc>"] = actions.close
                     }
                 }
@@ -64,6 +67,21 @@ return {
                     hidden = true,
                     -- Use fd for much faster file finding (install with: brew install fd)
                     find_command = { "fd", "--type", "f", "--strip-cwd-prefix", "--hidden", "--exclude", ".git" }
+                },
+                lsp_references = {
+                    -- Show only filename:line:col in list, full preview on right
+                    fname_width = 50,
+                    show_line = false,
+                    include_declaration = false,
+                    include_current_line = false,
+                    path_display = { "smart" },
+                    layout_strategy = "vertical",
+                    layout_config = {
+                        width = 0.9,
+                        height = 0.9,
+                        preview_height = 0.6,
+                        mirror = false,
+                    },
                 }
             }
         })
@@ -82,7 +100,13 @@ return {
         keymap("n", "<leader>fc", "<cmd>Telescope grep_string<CR>", { desc = "Find string under cursor" })
         keymap("n", "<leader>fs", "<cmd>Telescope lsp_document_symbols<CR>", { desc = "Document symbols" })
         keymap("n", "<leader>fS", "<cmd>Telescope lsp_workspace_symbols<CR>", { desc = "Workspace symbols" })
-        
+
+        -- LSP references
+        keymap("n", "ga", "<cmd>Telescope lsp_references<CR>", { desc = "LSP references" })
+
+        -- Document symbols
+        keymap("n", "<leader>o", "<cmd>Telescope lsp_document_symbols<CR>", { desc = "Document symbols" })
+
         -- Git
         keymap("n", "<leader>gc", "<cmd>Telescope git_status<CR>", { desc = "Git changed files" })
     end

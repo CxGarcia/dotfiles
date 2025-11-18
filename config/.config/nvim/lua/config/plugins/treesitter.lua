@@ -50,7 +50,10 @@ return {
                         ["ii"] = "@conditional.inner",
                         -- Loops
                         ["al"] = "@loop.outer",
-                        ["il"] = "@loop.inner"
+                        ["il"] = "@loop.inner",
+                        -- Definitions (functions, methods, variables)
+                        ["ad"] = "@function.outer",
+                        ["id"] = "@function.inner"
                     }
                 },
                 move = {

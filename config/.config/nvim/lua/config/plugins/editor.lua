@@ -65,7 +65,11 @@ return {
         "ggandor/leap.nvim",
         event = "VeryLazy",
         config = function()
-            require("leap").add_default_mappings()
+            local leap = require("leap")
+            -- Set up default keymaps (replaces deprecated add_default_mappings)
+            vim.keymap.set({'n', 'x', 'o'}, 's',  '<Plug>(leap-forward)')
+            vim.keymap.set({'n', 'x', 'o'}, 'S',  '<Plug>(leap-backward)')
+            vim.keymap.set({'n', 'x', 'o'}, 'gs', '<Plug>(leap-from-window)')
         end
     },
 
@@ -156,6 +160,56 @@ return {
         "stevearc/dressing.nvim",
         event = "VeryLazy",
         config = true
+    },
+
+    -- Lazygit integration
+    {
+        "kdheepak/lazygit.nvim",
+        cmd = {
+            "LazyGit",
+            "LazyGitConfig",
+            "LazyGitCurrentFile",
+            "LazyGitFilter",
+            "LazyGitFilterCurrentFile",
+        },
+        dependencies = {
+            "nvim-lua/plenary.nvim",
+        },
+        keys = {
+            { "<leader>gg", "<cmd>LazyGit<cr>", desc = "LazyGit" }
+        }
+    },
+
+    -- Better code folding
+    {
+        "kevinhwang91/nvim-ufo",
+        dependencies = {
+            "kevinhwang91/promise-async"
+        },
+        event = "BufReadPost",
+        config = function()
+            -- Configure fold options
+            vim.o.foldcolumn = '1'
+            vim.o.foldlevel = 99
+            vim.o.foldlevelstart = 99
+            vim.o.foldenable = true
+
+            -- Keymaps for folding
+            vim.keymap.set('n', 'zR', require('ufo').openAllFolds, { desc = "Open all folds" })
+            vim.keymap.set('n', 'zM', require('ufo').closeAllFolds, { desc = "Close all folds" })
+            vim.keymap.set('n', 'zK', function()
+                local winid = require('ufo').peekFoldedLinesUnderCursor()
+                if not winid then
+                    vim.lsp.buf.hover()
+                end
+            end, { desc = "Peek fold or hover" })
+
+            require('ufo').setup({
+                provider_selector = function(bufnr, filetype, buftype)
+                    return {'treesitter', 'indent'}
+                end
+            })
+        end
     }
 }
 
