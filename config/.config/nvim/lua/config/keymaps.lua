@@ -33,6 +33,9 @@ keymap("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 -- Better paste (don't yank replaced text)
 keymap("x", "p", '"_dP', { desc = "Paste without yanking" })
 
+-- Delete and copy in visual mode
+keymap("x", "x", "d", { desc = "Cut (delete and copy)" })
+
 -- Quick save and quit
 keymap("n", "<leader>w", "<cmd>w<CR>", { desc = "Save file" })
 keymap("n", "<leader>q", "<cmd>q<CR>", { desc = "Quit" })
@@ -47,3 +50,24 @@ keymap("n", "g/", "<cmd>Telescope live_grep<CR>", { desc = "Search across all fi
 keymap("n", "<leader>k", "<cmd>Telescope project<CR>", { desc = "Search across all files" })
 
 keymap("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Toggle Claude Code" })
+
+-- Commands to copy file paths
+vim.api.nvim_create_user_command("Crp", function()
+    local path = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
+    if path == "" then
+        vim.notify("No file in current buffer", vim.log.levels.WARN)
+        return
+    end
+    vim.fn.setreg("+", path)
+    vim.notify("Copied relative path: " .. path, vim.log.levels.INFO)
+end, { desc = "Copy relative path of current buffer" })
+
+vim.api.nvim_create_user_command("Cra", function()
+    local path = vim.fn.expand("%:p")
+    if path == "" then
+        vim.notify("No file in current buffer", vim.log.levels.WARN)
+        return
+    end
+    vim.fn.setreg("+", path)
+    vim.notify("Copied absolute path: " .. path, vim.log.levels.INFO)
+end, { desc = "Copy absolute path of current buffer" })

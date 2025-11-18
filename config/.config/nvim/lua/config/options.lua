@@ -57,4 +57,15 @@ opt.backup = false
 opt.writebackup = false
 opt.swapfile = false
 
+-- Shell configuration to load zsh with .zshrc
+opt.shell = "/bin/zsh"
+opt.shellcmdflag = "-i -c"
 
+-- Session options (what gets saved in sessions)
+opt.sessionoptions = {
+    "buffers",    -- Save buffer list
+    "curdir",     -- Save current directory
+    "tabpages",   -- Save tab pages
+    "winsize",    -- Save window sizes
+    "winpos",     -- Save window positions
+}
