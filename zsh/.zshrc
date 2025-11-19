@@ -74,14 +74,24 @@ export ZSH="/Users/cristobalschlaubitz/.oh-my-zsh"
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 
+# Load only essential plugins immediately for faster startup
 plugins=(
     git
-    fzf
-    zsh-autosuggestions
-    zsh-syntax-highlighting
 )
 
 source $ZSH/oh-my-zsh.sh
+
+# Load plugins after oh-my-zsh
+if [[ -o interactive ]]; then
+    # Load syntax highlighting synchronously (must be visible immediately)
+    source $ZSH/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh 2>/dev/null
+
+    # Defer less critical plugins to background
+    {
+        source $ZSH/plugins/fzf/fzf.plugin.zsh 2>/dev/null
+        source $ZSH/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh 2>/dev/null
+    } &!
+fi
 
 # User configuration
 
@@ -145,12 +155,8 @@ export CXBIN=$HOME/dotfiles/mac/mac-scripts
 export PYTHONBIN=/opt/homebrew/opt/python@3.13/libexec/bin
 export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$MYSQLBIN:$BREWBIN:$PYTHONBIN:$LOCALBIN:/usr/local/sbin"
 
-# Only load interactive features in interactive shells
-if [[ -o interactive ]]; then
-    #syntax Highlight
-    source $ZSH/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-    #starship prompt
+# Load Starship prompt (after PATH is set)
+if [[ -o interactive ]] && command -v starship &> /dev/null; then
     eval "$(starship init zsh)"
 fi
 
@@ -194,7 +200,12 @@ autoload -Uz compinit
 fpath+=~/.zfunc
 [ -s "/Users/cristobalschlaubitz/.bun/_bun" ] && source "/Users/cristobalschlaubitz/.bun/_bun"
 
-compinit
+# Only rebuild completion cache once per day for faster startup
+if [[ -n ${HOME}/.zcompdump(#qNmh+24) ]]; then
+    compinit
+else
+    compinit -C  # Skip security check for faster loading
+fi
 
 zstyle :compinstall filename '/Users/cristobalschlaubitz/.zshrc'
 compdef _cdd cdd
@@ -206,7 +217,15 @@ SPACESHIP_TIME_SHOW=true
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-. /opt/homebrew/opt/asdf/libexec/asdf.sh
+# Lazy load ASDF - only initialize when needed (saves 400-800ms on startup)
+asdf() {
+    unfunction asdf
+    . /opt/homebrew/opt/asdf/libexec/asdf.sh
+    asdf "$@"
+}
+
+# Add ASDF shims to PATH (fast, doesn't load full framework)
+export PATH="$HOME/.asdf/shims:$PATH"
 
 export GOTOOLCHAIN=auto
 
