@@ -40,6 +40,7 @@
   },
   "Blend" : 0.050000000000000003,
   "Mouse Reporting" : true,
+  "Report Modifiers Using CSI u" : true,
   "Cursor Boost" : 0,
   "Ansi 4 Color" : {
     "Red Component" : 0.15404300391674042,
@@ -647,6 +648,7 @@
     "Green Component" : 0.84313726425170898
   },
   "Mouse Reporting" : true,
+  "Report Modifiers Using CSI u" : true,
   "Cursor Boost" : 0,
   "Ansi 4 Color" : {
     "Red Component" : 0.15404300391674042,
@@ -1243,6 +1245,7 @@
     "Green Component" : 0.84313726425170898
   },
   "Mouse Reporting" : true,
+  "Report Modifiers Using CSI u" : true,
   "Cursor Boost" : 0,
   "Ansi 4 Color" : {
     "Red Component" : 0.15404300391674042,

@@ -60,18 +60,7 @@ return {
         end
     },
 
-    -- Enhanced f/t motions
-    {
-        "ggandor/leap.nvim",
-        event = "VeryLazy",
-        config = function()
-            local leap = require("leap")
-            -- Set up default keymaps (replaces deprecated add_default_mappings)
-            vim.keymap.set({'n', 'x', 'o'}, 's',  '<Plug>(leap-forward)')
-            vim.keymap.set({'n', 'x', 'o'}, 'S',  '<Plug>(leap-backward)')
-            vim.keymap.set({'n', 'x', 'o'}, 'gs', '<Plug>(leap-from-window)')
-        end
-    },
+    -- Enhanced f/t motions - replaced by flash.nvim (see flash.lua)
 
     -- Enhanced text objects
     {
@@ -101,9 +90,11 @@ return {
                 { "<leader>b", group = "Buffer" },
                 { "<leader>g", group = "Git" },
                 { "<leader>go", group = "Go" },
-                { "<leader>c", group = "Code" },
+                { "<leader>c", group = "Code/Conflict" },
                 { "<leader>r", group = "Rename" },
-                { "<leader>x", group = "Diagnostics" }
+                { "<leader>x", group = "Diagnostics" },
+                { "<leader>n", group = "Noice" },
+                { "<leader>u", group = "UI" }
             })
         end
     },

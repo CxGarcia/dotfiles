@@ -1,22 +1,7 @@
--- Catppuccin Theme - A beautiful, modern color scheme
 return {
-    "catppuccin/nvim",
-    name = "catppuccin",
-    priority = 1000,
+    "rose-pine/neovim",
+    name = "rose-pine",
     config = function()
-        require("catppuccin").setup({
-            flavour = "mocha", -- latte, frappe, macchiato, mocha
-            transparent_background = false,
-            integrations = {
-                telescope = true,
-                treesitter = true,
-                which_key = true,
-                gitsigns = true,
-                leap = true,
-            }
-        })
-        vim.cmd.colorscheme("catppuccin")
+        vim.cmd("colorscheme rose-pine")
     end
 }
-
-

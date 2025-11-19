@@ -75,10 +75,10 @@ return {
 
             -- Window navigation from terminal (unless disabled)
             if not vim.b[bufnr].skip_nav_keymaps then
-                vim.keymap.set('t', '<C-h>', [[<Cmd>wincmd h<CR>]], opts)
-                vim.keymap.set('t', '<C-j>', [[<Cmd>wincmd j<CR>]], opts)
-                vim.keymap.set('t', '<C-k>', [[<Cmd>wincmd k<CR>]], opts)
-                vim.keymap.set('t', '<C-l>', [[<Cmd>wincmd l<CR>]], opts)
+                vim.keymap.set('t', '<C-h>', function() require("tmux").move_left() end, opts)
+                vim.keymap.set('t', '<C-j>', function() require("tmux").move_down() end, opts)
+                vim.keymap.set('t', '<C-k>', function() require("tmux").move_up() end, opts)
+                vim.keymap.set('t', '<C-l>', function() require("tmux").move_right() end, opts)
             end
 
             -- Close terminal (always available)
