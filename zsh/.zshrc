@@ -203,3 +203,6 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 export GOTOOLCHAIN=auto
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# Nest development environment
+source ~/.nest/nest-init.sh

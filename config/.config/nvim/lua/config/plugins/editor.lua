@@ -99,7 +99,8 @@ return {
             wk.add({
                 { "<leader>f", group = "Find" },
                 { "<leader>b", group = "Buffer" },
-                { "<leader>g", group = "Git/Go" },
+                { "<leader>g", group = "Git" },
+                { "<leader>go", group = "Go" },
                 { "<leader>c", group = "Code" },
                 { "<leader>r", group = "Rename" },
                 { "<leader>x", group = "Diagnostics" }

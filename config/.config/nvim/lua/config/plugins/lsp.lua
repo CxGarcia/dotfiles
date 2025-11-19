@@ -188,7 +188,7 @@ return {
             vim.lsp.config.ts_ls = {
                 cmd = { "typescript-language-server", "--stdio" },
                 filetypes = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
-                root_markers = { "package.json", "tsconfig.json", "jsconfig.json", ".git" },
+                root_markers = { "bun.lockb", "package.json", "tsconfig.json", "jsconfig.json", ".git" },
                 capabilities = capabilities,
                 on_attach = function(client, bufnr)
                     -- Disable ts_ls formatting in favor of ESLint/Prettier
@@ -441,14 +441,27 @@ return {
                 }
             })
 
-            -- Go-specific keymaps
-            local keymap = vim.keymap.set
-            keymap("n", "<leader>gt", "<cmd>GoTest<CR>", { desc = "Go Test" })
-            keymap("n", "<leader>gT", "<cmd>GoTestFunc<CR>", { desc = "Go Test Function" })
-            keymap("n", "<leader>gc", "<cmd>GoCoverage<CR>", { desc = "Go Coverage" })
-            keymap("n", "<leader>gi", "<cmd>GoImport<CR>", { desc = "Go Import" })
-            keymap("n", "<leader>gf", "<cmd>GoFillStruct<CR>", { desc = "Go Fill Struct" })
-            keymap("n", "<leader>ge", "<cmd>GoIfErr<CR>", { desc = "Go If Err" })
+            -- Go-specific keymaps (buffer-local, only active in Go files)
+            -- NOTE: Using <leader>go* prefix to avoid conflicts with git keybindings
+            -- To debug keybindings: :KeymapShow <leader>goc
+            -- To list all <leader>go keybindings: :KeymapList <leader>go
+            -- To check for conflicts: :KeymapConflicts
+            local function setup_go_keymaps()
+                local keymap = vim.keymap.set
+                local opts = { buffer = true, silent = true }
+                keymap("n", "<leader>got", "<cmd>GoTest<CR>", vim.tbl_extend("force", opts, { desc = "Go Test" }))
+                keymap("n", "<leader>goT", "<cmd>GoTestFunc<CR>", vim.tbl_extend("force", opts, { desc = "Go Test Function" }))
+                keymap("n", "<leader>goc", "<cmd>GoCoverage<CR>", vim.tbl_extend("force", opts, { desc = "Go Coverage" }))
+                keymap("n", "<leader>goi", "<cmd>GoImport<CR>", vim.tbl_extend("force", opts, { desc = "Go Import" }))
+                keymap("n", "<leader>gof", "<cmd>GoFillStruct<CR>", vim.tbl_extend("force", opts, { desc = "Go Fill Struct" }))
+                keymap("n", "<leader>goe", "<cmd>GoIfErr<CR>", vim.tbl_extend("force", opts, { desc = "Go If Err" }))
+            end
+
+            -- Set up keymaps for Go files
+            vim.api.nvim_create_autocmd("FileType", {
+                pattern = { "go", "gomod" },
+                callback = setup_go_keymaps
+            })
         end,
         event = { "CmdlineEnter" },
         ft = { "go", "gomod" },

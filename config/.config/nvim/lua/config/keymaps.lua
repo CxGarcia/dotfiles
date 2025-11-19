@@ -49,8 +49,6 @@ keymap("n", "<leader>bd", "<cmd>bdelete<CR>", { desc = "Delete buffer" })
 keymap("n", "g/", "<cmd>Telescope live_grep<CR>", { desc = "Search across all files" })
 keymap("n", "<leader>k", "<cmd>Telescope project<CR>", { desc = "Search across all files" })
 
-keymap("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Toggle Claude Code" })
-
 -- Commands to copy file paths
 vim.api.nvim_create_user_command("Crp", function()
     local path = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")

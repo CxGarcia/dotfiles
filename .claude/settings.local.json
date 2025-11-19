@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nvim:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:neovim.io)",
+      "WebFetch(domain:neovim.discourse.group)",
+      "Bash(git config:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

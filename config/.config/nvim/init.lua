@@ -25,3 +25,32 @@ require("lazy").setup("config.plugins", {
     checker = { enabled = false },
     change_detection = { notify = false }
 })
+
+-- Load keymap conflict detection
+local keymap_conflicts = require("config.keymap-conflicts")
+
+-- Check for conflicts on startup
+keymap_conflicts.check_on_startup()
+
+-- Create user commands for keymap conflict detection
+vim.api.nvim_create_user_command("KeymapConflicts", function()
+    keymap_conflicts.show_conflicts()
+end, { desc = "Show keybinding conflicts" })
+
+vim.api.nvim_create_user_command("KeymapList", function(opts)
+    local prefix = opts.args ~= "" and opts.args or "<leader>"
+    keymap_conflicts.list_prefix(prefix)
+end, { nargs = "?", desc = "List keymaps with a prefix (default: <leader>)" })
+
+vim.api.nvim_create_user_command("KeymapShow", function(opts)
+    if opts.args == "" then
+        print("Usage: :KeymapShow <key> [mode]")
+        print("Example: :KeymapShow <leader>gc")
+        print("Example: :KeymapShow <leader>gc n")
+        return
+    end
+    local parts = vim.split(opts.args, " ")
+    local key = parts[1]
+    local mode = parts[2] or "n"
+    keymap_conflicts.show_keymap(key, mode)
+end, { nargs = "*", desc = "Show what a specific keybinding does" })
