@@ -115,5 +115,24 @@ return {
 
 		-- Git
 		keymap("n", "<leader>gc", "<cmd>Telescope git_status<CR>", { desc = "Git changed files" })
+
+		-- Terminals - custom picker to show only terminal buffers
+		keymap("n", "<leader>tf", function()
+			require("telescope.builtin").buffers({
+				prompt_title = "Find Terminals",
+				only_cwd = false,
+				attach_mappings = function(_, map)
+					-- Keep default mappings
+					return true
+				end,
+				-- Filter to show only terminal buffers
+				entry_maker = function(entry)
+					local bufnr = entry.bufnr
+					if vim.api.nvim_buf_get_option(bufnr, "buftype") == "terminal" then
+						return require("telescope.make_entry").gen_from_buffer()(entry)
+					end
+				end,
+			})
+		end, { desc = "Find terminals" })
 	end,
 }

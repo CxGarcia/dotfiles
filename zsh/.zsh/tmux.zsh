@@ -133,6 +133,10 @@ function ts() {
 # Changed from Ctrl-s to free up Ctrl keys for applications
 bindkey -s '\es' 'ts\n'
 
+# Ctrl-Space to open tmux session switcher (matches tmux binding for consistency)
+# This allows Ctrl-Space to work both inside and outside tmux
+bindkey -s '^ ' 'ts\n'
+
 # tkill: Kill all active tmux sessions
 function tkill() {
     if ! tmux list-sessions 2>/dev/null; then

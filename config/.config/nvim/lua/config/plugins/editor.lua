@@ -8,10 +8,11 @@ return {
         config = function()
             require("nvim-surround").setup({
                 move_cursor = false,
-                keymaps = {
-                    visual = "gs",
-                    visual_line = "gS"
-                }
+                -- Using default keymaps: s/S in visual mode
+                -- keymaps = {
+                --     visual = "gs",
+                --     visual_line = "gS"
+                -- }
             })
         end
     },

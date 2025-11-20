@@ -121,9 +121,6 @@ return {
                 keymap("n", "g[", vim.diagnostic.goto_prev, vim.tbl_extend("force", opts, { desc = "Previous diagnostic" }))
                 keymap("n", "g]", vim.diagnostic.goto_next, vim.tbl_extend("force", opts, { desc = "Next diagnostic" }))
                 keymap("n", "<leader>q", vim.diagnostic.setloclist, vim.tbl_extend("force", opts, { desc = "Quickfix diagnostics" }))
-                keymap("n", "<leader>fm", function()
-                    vim.lsp.buf.format({ async = true })
-                end, vim.tbl_extend("force", opts, { desc = "Format document" }))
 
                 -- Notify when LSP attaches
                 vim.notify("LSP attached: " .. client.name, vim.log.levels.INFO)
@@ -191,6 +188,7 @@ return {
             -- TypeScript/JavaScript (ts_ls) configuration
             vim.lsp.config.ts_ls = {
                 cmd = { "typescript-language-server", "--stdio" },
+                cmd_env = { NODE_OPTIONS = "--max-old-space-size=16384" },
                 filetypes = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
                 root_markers = { "bun.lockb", "package.json", "tsconfig.json", "jsconfig.json", ".git" },
                 capabilities = capabilities,

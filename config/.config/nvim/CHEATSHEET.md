@@ -30,6 +30,7 @@
 | ---------------------------- | -------------------------------------------- |
 | `<leader>p` or `<leader>ff`  | **Find files** (most used!)                  |
 | `<leader>fb`                 | **Find buffers** (switch between open files) |
+| `<leader>tf`                 | **Find terminals** (list all open terminals) |
 | `<leader>fr`                 | Recent files                                 |
 | `g/`                         | **Search across all files** (live grep) ⚡   |
 | `<leader>fg`                 | Live grep (search text in all files)         |
@@ -135,6 +136,61 @@ Search and jump directly to any buffer by name.
 
 ---
 
+## 💻 TERMINAL MANAGEMENT
+
+### Opening Terminals
+
+| Keymap       | Action                         |
+| ------------ | ------------------------------ |
+| `<leader>tt` | Toggle floating terminal       |
+| `<leader>th` | Toggle horizontal terminal     |
+| `<leader>tv` | Toggle vertical terminal       |
+| `<leader>tn` | Toggle Node REPL               |
+| `<leader>tp` | Toggle Python REPL             |
+| `<leader>cc` | Toggle Claude Code             |
+| `Alt-,`      | Quick toggle Claude Code       |
+
+### Managing Multiple Terminals
+
+| Keymap       | Action                            |
+| ------------ | --------------------------------- |
+| `<leader>tf` | **Find terminals** (Telescope)    |
+| `<leader>t1` | Switch to terminal 1              |
+| `<leader>t2` | Switch to terminal 2              |
+| `<leader>t3` | Switch to terminal 3              |
+| `<leader>t4` | Switch to terminal 4              |
+| `<leader>ta` | Toggle all terminals              |
+
+### Inside Terminal Mode
+
+| Keymap            | Action                          |
+| ----------------- | ------------------------------- |
+| `Esc` or `jk`     | Exit terminal mode (to normal)  |
+| `Ctrl-h/j/k/l`    | Navigate to other windows       |
+| `Ctrl-w`          | Close current terminal          |
+| `Alt-h`           | Toggle horizontal terminal      |
+| `Alt-v`           | Toggle vertical terminal        |
+
+### Terminal Workflow
+
+```
+1. Open floating terminal:     <leader>tt
+2. Run your commands:           (type normally)
+3. Exit to normal mode:         Esc
+4. Navigate to code:            Ctrl-h/j/k/l
+5. Back to terminal:            <leader>tt (toggles)
+6. Need another terminal?       <leader>t2 (opens terminal 2)
+7. Switch between them:         <leader>t1 / <leader>t2
+```
+
+**Tips:**
+- Terminals persist - they don't close when you toggle them, just hide
+- Each terminal (1-4) maintains its own shell session
+- Use floating for quick commands, horizontal/vertical for side-by-side work
+- Terminal 1 is the default when you use `<leader>tt`
+
+---
+
 ## 🎯 QUICK WORKFLOW TIPS
 
 ### Opening Files - The Three Main Ways:
@@ -218,7 +274,8 @@ Your changes are **always visible** in the left gutter:
 | `ds"`   | Delete surrounding "        | `"hello"` → `hello`    |
 | `ysiw"` | Surround word with "        | `hello` → `"hello"`    |
 | `yss)`  | Surround entire line        | `hello` → `(hello)`    |
-| `gs`    | Surround selection (visual) | Select text then `gs"` |
+| `s`     | Surround selection (visual) | Select text then `s"`  |
+| `S`     | Surround lines (visual)     | Select lines then `S"` |
 
 ### Built-in Text Objects (work everywhere)
 
@@ -375,4 +432,16 @@ da(   - Delete around () (includes parens)
 vif   - Select inside function
 cad   - Change around definition
 vid   - Select inside definition
+```
+
+### Terminal
+
+```
+<leader>tt    - Toggle floating terminal
+<leader>th    - Toggle horizontal terminal
+<leader>tv    - Toggle vertical terminal
+<leader>tf    - Find terminals (Telescope)
+Esc (in term) - Exit terminal mode
+Ctrl-w        - Close terminal
+<leader>t1-4  - Switch between terminals
 ```
