@@ -111,30 +111,17 @@ function ts() {
     local session=$(
         sesh list | \
         fzf \
-            --height=80% \
+            --height=50% \
             --border=rounded \
             --border-label=' Sessions ' \
             --prompt='❯ ' \
             --pointer='▶' \
-            --header='Enter: switch | Ctrl-d: delete' \
-            --preview='
-                if tmux has-session -t {} 2>/dev/null; then
-                    echo "Session: {}"
-                    echo ""
-                    tmux list-windows -t {} -F "  #{window_index}: #{window_name}"
-                elif [ -d "{}" ]; then
-                    echo "Directory: {}"
-                    echo ""
-                    if command -v eza &> /dev/null; then
-                        eza -la --icons --git --color=always {} 2>/dev/null | head -15
-                    else
-                        ls -lah {} | tail -n +4 | head -15
-                    fi
-                else
-                    echo "New session: {}"
-                fi
-            ' \
-            --preview-window='right:55%:border-rounded' \
+            --color=bg+:#252c33,bg:#252c33,spinner:#9ccfd8,hl:#ebbcba \
+            --color=fg:#e0def4,header:#eb6f92,info:#c4a7e7,pointer:#9ccfd8 \
+            --color=marker:#eb6f92,fg+:#e0def4,prompt:#c4a7e7,hl+:#ebbcba \
+            --color=border:#6e6a86 \
+            --margin=5%,20%,5%,20% \
+            --no-preview \
             --bind='ctrl-d:execute(tmux kill-session -t {})+reload(sesh list)'
     )
 
@@ -144,8 +131,18 @@ function ts() {
 
 # Keybindings: Ctrl-s to open tmux session switcher
 bindkey -s '^s' 'ts\n'
-# Ctrl-a removed to avoid conflict with tmux prefix (C-a)
-# bindkey -s '^a' 'ts\n'
+
+# tkill: Kill all active tmux sessions
+function tkill() {
+    if ! tmux list-sessions 2>/dev/null; then
+        echo "No active tmux sessions"
+        return 0
+    fi
+
+    echo "Killing all tmux sessions..."
+    tmux kill-server
+    echo "All tmux sessions killed"
+}
 
 # Smart tmux alias - never create unwanted sessions
 alias tm='t'

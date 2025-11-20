@@ -6,9 +6,20 @@ return {
         event = "VeryLazy",
         dependencies = { "nvim-tree/nvim-web-devicons" },
         config = function()
+            local bg_highlight = "#2d3843"
+
+            -- Get rose-pine theme and override background colors
+            local rose_pine = require("lualine.themes.rose-pine")
+
+            -- Override the b and c section backgrounds to use our highlight color
+            for _, mode in pairs(rose_pine) do
+                if mode.b then mode.b.bg = bg_highlight end
+                if mode.c then mode.c.bg = bg_highlight end
+            end
+
             require("lualine").setup({
                 options = {
-                    theme = "catppuccin",
+                    theme = rose_pine,
                     component_separators = { left = "", right = "" },
                     section_separators = { left = "", right = "" },
                     globalstatus = true
