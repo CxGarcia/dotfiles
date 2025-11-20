@@ -47,20 +47,6 @@ return {
         },
     },
     keys = {
-        -- Main flash keybinding (s in normal/visual mode)
-        {
-            "s",
-            mode = { "n", "x", "o" },
-            function() require("flash").jump() end,
-            desc = "Flash"
-        },
-        -- Flash treesitter (S in normal/visual/operator mode)
-        {
-            "S",
-            mode = { "n", "x", "o" },
-            function() require("flash").treesitter() end,
-            desc = "Flash Treesitter"
-        },
         -- Remote Flash (for operating on distant text)
         {
             "r",
@@ -75,7 +61,7 @@ return {
             function() require("flash").treesitter_search() end,
             desc = "Treesitter Search"
         },
-        -- Toggle flash in search
+        -- Toggle flash in search (Ctrl-s while typing / search)
         {
             "<c-s>",
             mode = { "c" },

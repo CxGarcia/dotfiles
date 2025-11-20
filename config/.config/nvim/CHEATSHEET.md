@@ -53,12 +53,40 @@
 
 ## 📑 BUFFER NAVIGATION
 
-| Keymap       | Action                                          |
-| ------------ | ----------------------------------------------- |
-| `Shift-h`    | **Previous buffer**                             |
-| `Shift-l`    | **Next buffer**                                 |
-| `<leader>fb` | Find buffer (Telescope - best for many buffers) |
-| `<leader>bd` | Delete/close current buffer                     |
+### Three Mental Models for Buffers
+
+**1. Linear List Model** (what Shift-h/l does)
+Think of buffers as a carousel you cycle through:
+```
+[buf1] → [buf2] → [buf3] → [buf4] → (back to buf1)
+```
+
+**2. Jump List Model** (built-in, super useful!)
+Jump to places you've recently been:
+```
+Current → Last → 2nd-to-last → ...
+```
+
+**3. Fuzzy Finder Model** (fastest for many buffers)
+Search and jump directly to any buffer by name.
+
+### Buffer Keymaps
+
+| Keymap        | Action                                             |
+| ------------- | -------------------------------------------------- |
+| `Shift-h`     | Previous buffer (linear cycling)                   |
+| `Shift-l`     | Next buffer (linear cycling)                       |
+| `Ctrl-6`      | **Toggle between last 2 buffers** (use this most!) |
+| `Ctrl-o`      | Jump to older location in jump list                |
+| `Ctrl-i`      | Jump to newer location in jump list                |
+| `<leader>fb`  | Find buffer (Telescope - best for many buffers)    |
+| `<leader>bd`  | Delete/close current buffer                        |
+
+### Recommended Workflow
+
+**80% of the time:** Use `Ctrl-6` to toggle between your two main files
+**When you need a specific file:** Use `<leader>fb` to fuzzy find it
+**When browsing:** Use `Shift-h`/`Shift-l` to cycle through the bufferline
 
 **Tip:** You can also click on buffers in the top bar!
 

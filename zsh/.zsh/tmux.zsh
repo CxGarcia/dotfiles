@@ -129,8 +129,9 @@ function ts() {
     sesh connect "$session"
 }
 
-# Keybindings: Ctrl-s to open tmux session switcher
-bindkey -s '^s' 'ts\n'
+# Keybindings: Meta-s (Alt-s) to open tmux session switcher
+# Changed from Ctrl-s to free up Ctrl keys for applications
+bindkey -s '\es' 'ts\n'
 
 # tkill: Kill all active tmux sessions
 function tkill() {

@@ -7,6 +7,7 @@ return {
         dependencies = { "nvim-tree/nvim-web-devicons" },
         config = function()
             local bg_highlight = "#2d3843"
+            local fam_primary = "#FF87D7" -- Primary color from ~/dev/fam TUI
 
             -- Get rose-pine theme and override background colors
             local rose_pine = require("lualine.themes.rose-pine")
@@ -15,6 +16,25 @@ return {
             for _, mode in pairs(rose_pine) do
                 if mode.b then mode.b.bg = bg_highlight end
                 if mode.c then mode.c.bg = bg_highlight end
+            end
+
+            -- Function to detect if we're in terminal mode and use fam primary color
+            local function get_mode_color()
+                if vim.bo.buftype == "terminal" then
+                    return fam_primary
+                end
+                return nil -- Use default theme color
+            end
+
+            -- Override terminal mode colors to use fam primary
+            if rose_pine.terminal then
+                rose_pine.terminal.a.bg = fam_primary
+            else
+                rose_pine.terminal = {
+                    a = { fg = "#000000", bg = fam_primary, gui = "bold" },
+                    b = { bg = bg_highlight },
+                    c = { bg = bg_highlight }
+                }
             end
 
             require("lualine").setup({

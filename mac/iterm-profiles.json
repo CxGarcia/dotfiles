@@ -1,6 +1,7 @@
 {
 "Profiles": [
 {
+  "Custom Directory" : "Recycle",
   "Working Directory" : "\/Users\/cristobalschlaubitz",
   "Prompt Before Closing 2" : false,
   "Selected Text Color" : {
@@ -32,15 +33,14 @@
   "Show Status Bar" : false,
   "Character Encoding" : 4,
   "Selection Color" : {
-    "Red Component" : 0.70196080207824707,
-    "Color Space" : "sRGB",
-    "Blue Component" : 1,
+    "Red Component" : 0.72941176470588232,
+    "Color Space" : "P3",
+    "Blue Component" : 0.98431372549019602,
     "Alpha Component" : 1,
-    "Green Component" : 0.84313726425170898
+    "Green Component" : 0.83529411764705885
   },
   "Blend" : 0.050000000000000003,
   "Mouse Reporting" : true,
-  "Report Modifiers Using CSI u" : true,
   "Cursor Boost" : 0,
   "Ansi 4 Color" : {
     "Red Component" : 0.15404300391674042,
@@ -60,6 +60,7 @@
     "slogin",
     "telnet"
   ],
+  "Non-ASCII Ligatures" : false,
   "Scrollback Lines" : 0,
   "HotKey Window Reopens On Activation" : false,
   "Status Bar Layout" : {
@@ -145,11 +146,11 @@
   "Brighten Bold Text" : true,
   "Flashing Bell" : false,
   "Cursor Guide Color" : {
-    "Red Component" : 0.70213186740875244,
-    "Color Space" : "sRGB",
-    "Blue Component" : 1,
+    "Red Component" : 0.74509803921568629,
+    "Color Space" : "P3",
+    "Blue Component" : 0.9882352941176471,
     "Alpha Component" : 0.25,
-    "Green Component" : 0.9268307089805603
+    "Green Component" : 0.91764705882352937
   },
   "BM Growl" : true,
   "AWDS Window Directory" : "",
@@ -463,6 +464,7 @@
     "Alpha Component" : 1,
     "Green Component" : 0.67044717073440552
   },
+  "Mouse Reporting allow clicks and drags" : true,
   "Window Type" : 0,
   "Use Bright Bold" : true,
   "Has Hotkey" : false,
@@ -533,8 +535,9 @@
   },
   "AWDS Pane Directory" : "",
   "Blur" : false,
-  "Normal Font" : "FiraMonoNFM-Regular 15",
+  "Normal Font" : "FiraCodeNFM-SemBd 15",
   "Vertical Spacing" : 1.05,
+  "Allow Alternate Mouse Scroll" : true,
   "Ansi 7 Color" : {
     "Red Component" : 0.7810397744178772,
     "Color Space" : "sRGB",
@@ -547,8 +550,10 @@
   "AWDS Pane Option" : "Recycle",
   "HotKey Window AutoHides" : true,
   "Command" : "",
+  "Automatically Enable Alternate Mouse Scroll" : true,
   "Terminal Type" : "xterm-256color",
-  "Horizontal Spacing" : 1,
+  "Horizontal Spacing" : 0.97999999999999998,
+  "Restrict Alternate Mouse Scroll to Vertical" : true,
   "Option Key Sends" : 0,
   "Minimum Contrast" : 0.49679392688679247,
   "HotKey Window Animates" : true,
@@ -570,11 +575,11 @@
   "Transparency" : 0,
   "HotKey Activated By Modifier" : false,
   "Background Color" : {
-    "Red Component" : 0.98431372549019602,
+    "Red Component" : 0.14509803921568629,
     "Color Space" : "P3",
-    "Blue Component" : 0.89411764705882357,
+    "Blue Component" : 0.20000000000000001,
     "Alpha Component" : 1,
-    "Green Component" : 0.96470588235294119
+    "Green Component" : 0.17254901960784313
   },
   "Faint Text Alpha" : 0.49834168632075471,
   "Screen" : -2,
@@ -584,7 +589,7 @@
 
   ],
   "Initial Use Transparency" : false,
-  "Non Ascii Font" : "FiraMonoNFM-Regular 15",
+  "Non Ascii Font" : "FiraCodeNF-Bold 15",
   "Ansi 13 Color" : {
     "Red Component" : 0.8821563720703125,
     "Color Space" : "sRGB",
@@ -599,7 +604,7 @@
   "HotKey Alternate Shortcuts" : [
 
   ],
-  "Custom Directory" : "Recycle",
+  "ASCII Ligatures" : false,
   "Thin Strokes" : 4,
   "Ansi 5 Color" : {
     "Red Component" : 0.752197265625,
@@ -648,7 +653,6 @@
     "Green Component" : 0.84313726425170898
   },
   "Mouse Reporting" : true,
-  "Report Modifiers Using CSI u" : true,
   "Cursor Boost" : 0,
   "Ansi 4 Color" : {
     "Red Component" : 0.15404300391674042,
@@ -784,7 +788,7 @@
     "Alpha Component" : 1,
     "Green Component" : 1
   },
-  "Use Cursor Guide" : false,
+  "Use Cursor Guide" : true,
   "Unlimited Scrollback" : true,
   "Custom Command" : "Yes",
   "AWDS Tab Option" : "Recycle",
@@ -1245,7 +1249,6 @@
     "Green Component" : 0.84313726425170898
   },
   "Mouse Reporting" : true,
-  "Report Modifiers Using CSI u" : true,
   "Cursor Boost" : 0,
   "Ansi 4 Color" : {
     "Red Component" : 0.15404300391674042,
@@ -1381,7 +1384,7 @@
     "Alpha Component" : 1,
     "Green Component" : 1
   },
-  "Use Cursor Guide" : false,
+  "Use Cursor Guide" : true,
   "Unlimited Scrollback" : true,
   "Custom Command" : "Yes",
   "AWDS Tab Option" : "Recycle",

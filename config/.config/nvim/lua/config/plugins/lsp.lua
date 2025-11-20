@@ -109,6 +109,10 @@ return {
                 keymap("n", "<leader>k", vim.lsp.buf.signature_help, vim.tbl_extend("force", opts, { desc = "Signature help" }))
                 keymap("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Go to references" }))
                 keymap("n", "<leader>rn", vim.lsp.buf.rename, vim.tbl_extend("force", opts, { desc = "Rename symbol" }))
+                -- cd for "change definition" - uses inc-rename for live preview
+                keymap("n", "cd", function()
+                    return ":IncRename " .. vim.fn.expand("<cword>")
+                end, vim.tbl_extend("force", opts, { expr = true, desc = "Change definition (rename)" }))
                 keymap("n", "g.", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code action" }))
                 keymap("v", "g.", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code action" }))
                 keymap("n", "<leader>dl", function()
@@ -356,7 +360,7 @@ return {
                         -- Check for Copilot suggestion first
                         local copilot_keys = vim.fn["copilot#Accept"]()
                         if copilot_keys ~= "" then
-                            vim.api.nvim_feedkeys(copilot_keys, "i", true)
+                            vim.fn.feedkeys(copilot_keys, "")
                         elseif luasnip.expand_or_jumpable() then
                             luasnip.expand_or_jump()
                         elseif cmp.visible() then

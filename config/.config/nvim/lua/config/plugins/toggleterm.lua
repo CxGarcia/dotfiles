@@ -75,10 +75,10 @@ return {
 
             -- Window navigation from terminal (unless disabled)
             if not vim.b[bufnr].skip_nav_keymaps then
-                vim.keymap.set('t', '<C-h>', function() require("tmux").move_left() end, opts)
-                vim.keymap.set('t', '<C-j>', function() require("tmux").move_down() end, opts)
-                vim.keymap.set('t', '<C-k>', function() require("tmux").move_up() end, opts)
-                vim.keymap.set('t', '<C-l>', function() require("tmux").move_right() end, opts)
+                vim.keymap.set('t', '<C-h>', [[<C-\><C-n><C-w>h]], opts)
+                vim.keymap.set('t', '<C-j>', [[<C-\><C-n><C-w>j]], opts)
+                vim.keymap.set('t', '<C-k>', [[<C-\><C-n><C-w>k]], opts)
+                vim.keymap.set('t', '<C-l>', [[<C-\><C-n><C-w>l]], opts)
             end
 
             -- Close terminal (always available)
@@ -89,6 +89,21 @@ return {
         vim.api.nvim_create_autocmd("TermOpen", {
             pattern = "term://*",
             callback = function()
+                local bufnr = vim.api.nvim_get_current_buf()
+                local cmd = vim.api.nvim_buf_get_name(bufnr)
+
+                -- List of TUI apps that need native keybindings
+                local tui_apps = { "lazygit", "htop", "ranger", "k9s", "btm", "lazydocker", "ncdu" }
+
+                -- Check if this is a TUI app
+                for _, app in ipairs(tui_apps) do
+                    if cmd:match(app) then
+                        vim.b[bufnr].skip_terminal_keymaps = true
+                        return
+                    end
+                end
+
+                -- Regular terminal - apply keymaps
                 set_terminal_keymaps()
             end
         })

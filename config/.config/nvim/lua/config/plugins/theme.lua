@@ -12,7 +12,7 @@ return {
             highlight_groups = {
                 -- Main backgrounds
                 Normal = { bg = bg },
-                NormalFloat = { bg = bg },
+                NormalFloat = { bg = bg_highlight },
                 NormalNC = { bg = bg },
 
                 -- Statusline / Winbar
