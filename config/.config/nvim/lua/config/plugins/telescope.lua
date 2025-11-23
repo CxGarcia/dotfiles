@@ -93,12 +93,6 @@ return {
 				},
 			},
 			extensions = {
-				project = {
-					base_dirs = {
-						vim.fn.expand("~/dev"),
-					},
-					sync_with_nvim_tree = true,
-				},
 				frecency = {
 					show_scores = false,
 					show_unindexed = true,

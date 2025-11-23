@@ -79,3 +79,6 @@ config/.config/zed/prompts/
 config/.config/karabiner/automatic_backups/karabiner*
 
 .tui_state.json
+
+# GitHub Copilot credentials
+config/.config/github-copilot/apps.json

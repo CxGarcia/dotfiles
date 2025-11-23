@@ -136,13 +136,9 @@ function ts() {
     sesh connect "$session"
 }
 
-# Keybindings: Meta-s (Alt-s) to open tmux session switcher
-# Changed from Ctrl-s to free up Ctrl keys for applications
+# Keybindings: Option-s to open tmux session switcher
+# Note: Requires terminal to send Esc+ for Option key (iTerm2: Preferences > Profiles > Keys > Left Option = Esc+)
 bindkey -s '\es' 'ts\n'
-
-# Option-Space to open tmux session switcher (matches tmux binding for consistency)
-# This allows Option-Space to work both inside and outside tmux, freeing Ctrl-Space for Telescope
-bindkey -s '\e ' 'ts\n'
 
 # tkill: Kill all active tmux sessions
 function tkill() {

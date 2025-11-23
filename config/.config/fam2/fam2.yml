@@ -1,0 +1,4 @@
+projects:
+  - name: fam2
+    path: ~/dev/fam2
+    default_branch: main
