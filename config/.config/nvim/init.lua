@@ -1,3 +1,13 @@
+-- Enable faster Lua module loader (Neovim 0.9+)
+-- Must be set before any require() calls for maximum benefit
+vim.loader.enable()
+
+-- Disable unused providers (saves 10-20ms startup time)
+vim.g.loaded_python3_provider = 0
+vim.g.loaded_ruby_provider = 0
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_node_provider = 0
+
 -- Set leader key to space (must be set before lazy)
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
@@ -22,8 +32,28 @@ require("config.keymaps")
 
 -- Load plugins
 require("lazy").setup("config.plugins", {
+    defaults = {
+        lazy = true, -- Make all plugins lazy by default
+    },
     checker = { enabled = false },
-    change_detection = { notify = false }
+    change_detection = { notify = false },
+    performance = {
+        rtp = {
+            disabled_plugins = {
+                "gzip",
+                "matchit",
+                "matchparen",
+                "netrwPlugin",
+                "tarPlugin",
+                "tohtml",
+                "tutor",
+                "zipPlugin",
+            },
+        },
+    },
+    ui = {
+        border = "rounded",
+    },
 })
 
 -- Load keymap conflict detection
