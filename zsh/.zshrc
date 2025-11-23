@@ -224,17 +224,16 @@ asdf() {
 # Add ASDF shims to PATH (fast, doesn't load full framework)
 export PATH="$HOME/.asdf/shims:$PATH"
 
+export EDITOR=nvim
+export VISUAL=nvim
 export GOTOOLCHAIN=auto
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-# Nest development environment (only in interactive shells)
-if [[ -o interactive ]]; then
-    [ -f ~/.nest/nest-init.sh ] && source ~/.nest/nest-init.sh
-fi
+export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"
 
-# ==========================================
-# Load modular configurations
-# ==========================================
+# Added by Antigravity
+export PATH="/Users/cristobalschlaubitz/.antigravity/antigravity/bin:$PATH"
+
 [ -f ~/.zsh/fzf.zsh ] && source ~/.zsh/fzf.zsh
 [ -f ~/.zsh/tmux.zsh ] && source ~/.zsh/tmux.zsh
