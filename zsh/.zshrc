@@ -200,6 +200,13 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 . /opt/homebrew/opt/asdf/libexec/asdf.sh
 
+export EDITOR=nvim
+export VISUAL=nvim
 export GOTOOLCHAIN=auto
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"
+
+# Added by Antigravity
+export PATH="/Users/cristobalschlaubitz/.antigravity/antigravity/bin:$PATH"
