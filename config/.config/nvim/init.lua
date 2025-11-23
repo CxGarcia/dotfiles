@@ -59,8 +59,9 @@ require("lazy").setup("config.plugins", {
 -- Load keymap conflict detection
 local keymap_conflicts = require("config.keymap-conflicts")
 
--- Check for conflicts on startup
-keymap_conflicts.check_on_startup()
+-- Note: Automatic conflict checking disabled for performance (saves 50-100ms)
+-- Run :KeymapConflicts manually to check for conflicts when needed
+-- keymap_conflicts.check_on_startup()
 
 -- Create user commands for keymap conflict detection
 vim.api.nvim_create_user_command("KeymapConflicts", function()
