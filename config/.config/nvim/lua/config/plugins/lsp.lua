@@ -109,6 +109,10 @@ return {
                 keymap("n", "<leader>k", vim.lsp.buf.signature_help, vim.tbl_extend("force", opts, { desc = "Signature help" }))
                 keymap("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Go to references" }))
                 keymap("n", "<leader>rn", vim.lsp.buf.rename, vim.tbl_extend("force", opts, { desc = "Rename symbol" }))
+                -- cd for "change definition" - uses inc-rename for live preview
+                keymap("n", "cd", function()
+                    return ":IncRename " .. vim.fn.expand("<cword>")
+                end, vim.tbl_extend("force", opts, { expr = true, desc = "Change definition (rename)" }))
                 keymap("n", "g.", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code action" }))
                 keymap("v", "g.", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code action" }))
                 keymap("n", "<leader>dl", function()
@@ -117,9 +121,6 @@ return {
                 keymap("n", "g[", vim.diagnostic.goto_prev, vim.tbl_extend("force", opts, { desc = "Previous diagnostic" }))
                 keymap("n", "g]", vim.diagnostic.goto_next, vim.tbl_extend("force", opts, { desc = "Next diagnostic" }))
                 keymap("n", "<leader>q", vim.diagnostic.setloclist, vim.tbl_extend("force", opts, { desc = "Quickfix diagnostics" }))
-                keymap("n", "<leader>fm", function()
-                    vim.lsp.buf.format({ async = true })
-                end, vim.tbl_extend("force", opts, { desc = "Format document" }))
 
                 -- Notify when LSP attaches
                 vim.notify("LSP attached: " .. client.name, vim.log.levels.INFO)
@@ -187,8 +188,9 @@ return {
             -- TypeScript/JavaScript (ts_ls) configuration
             vim.lsp.config.ts_ls = {
                 cmd = { "typescript-language-server", "--stdio" },
+                cmd_env = { NODE_OPTIONS = "--max-old-space-size=16384" },
                 filetypes = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
-                root_markers = { "package.json", "tsconfig.json", "jsconfig.json", ".git" },
+                root_markers = { "bun.lockb", "package.json", "tsconfig.json", "jsconfig.json", ".git" },
                 capabilities = capabilities,
                 on_attach = function(client, bufnr)
                     -- Disable ts_ls formatting in favor of ESLint/Prettier
@@ -353,10 +355,14 @@ return {
                     ["<C-e>"] = cmp.mapping.abort(),
                     ["<CR>"] = cmp.mapping.confirm({ select = true }),
                     ["<Tab>"] = cmp.mapping(function(fallback)
-                        if cmp.visible() then
-                            cmp.select_next_item()
+                        -- Check for Copilot suggestion first
+                        local copilot_keys = vim.fn["copilot#Accept"]()
+                        if copilot_keys ~= "" then
+                            vim.fn.feedkeys(copilot_keys, "")
                         elseif luasnip.expand_or_jumpable() then
                             luasnip.expand_or_jump()
+                        elseif cmp.visible() then
+                            cmp.select_next_item()
                         else
                             fallback()
                         end
@@ -441,14 +447,27 @@ return {
                 }
             })
 
-            -- Go-specific keymaps
-            local keymap = vim.keymap.set
-            keymap("n", "<leader>gt", "<cmd>GoTest<CR>", { desc = "Go Test" })
-            keymap("n", "<leader>gT", "<cmd>GoTestFunc<CR>", { desc = "Go Test Function" })
-            keymap("n", "<leader>gc", "<cmd>GoCoverage<CR>", { desc = "Go Coverage" })
-            keymap("n", "<leader>gi", "<cmd>GoImport<CR>", { desc = "Go Import" })
-            keymap("n", "<leader>gf", "<cmd>GoFillStruct<CR>", { desc = "Go Fill Struct" })
-            keymap("n", "<leader>ge", "<cmd>GoIfErr<CR>", { desc = "Go If Err" })
+            -- Go-specific keymaps (buffer-local, only active in Go files)
+            -- NOTE: Using <leader>go* prefix to avoid conflicts with git keybindings
+            -- To debug keybindings: :KeymapShow <leader>goc
+            -- To list all <leader>go keybindings: :KeymapList <leader>go
+            -- To check for conflicts: :KeymapConflicts
+            local function setup_go_keymaps()
+                local keymap = vim.keymap.set
+                local opts = { buffer = true, silent = true }
+                keymap("n", "<leader>got", "<cmd>GoTest<CR>", vim.tbl_extend("force", opts, { desc = "Go Test" }))
+                keymap("n", "<leader>goT", "<cmd>GoTestFunc<CR>", vim.tbl_extend("force", opts, { desc = "Go Test Function" }))
+                keymap("n", "<leader>goc", "<cmd>GoCoverage<CR>", vim.tbl_extend("force", opts, { desc = "Go Coverage" }))
+                keymap("n", "<leader>goi", "<cmd>GoImport<CR>", vim.tbl_extend("force", opts, { desc = "Go Import" }))
+                keymap("n", "<leader>gof", "<cmd>GoFillStruct<CR>", vim.tbl_extend("force", opts, { desc = "Go Fill Struct" }))
+                keymap("n", "<leader>goe", "<cmd>GoIfErr<CR>", vim.tbl_extend("force", opts, { desc = "Go If Err" }))
+            end
+
+            -- Set up keymaps for Go files
+            vim.api.nvim_create_autocmd("FileType", {
+                pattern = { "go", "gomod" },
+                callback = setup_go_keymaps
+            })
         end,
         event = { "CmdlineEnter" },
         ft = { "go", "gomod" },

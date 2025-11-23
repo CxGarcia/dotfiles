@@ -1,11 +1,8 @@
--- Keymapskey
+-- Keymaps
 local keymap = vim.keymap.set
 
--- Better window navigation
-keymap("n", "<C-h>", "<C-w>h", { desc = "Go to left window" })
-keymap("n", "<C-j>", "<C-w>j", { desc = "Go to lower window" })
-keymap("n", "<C-k>", "<C-w>k", { desc = "Go to upper window" })
-keymap("n", "<C-l>", "<C-w>l", { desc = "Go to right window" })
+-- Note: Tmux navigation keymaps (C-h/j/k/l) are configured in tmux-integration.lua plugin
+-- This ensures they're only set up after the plugin is loaded
 
 -- Resize windows
 keymap("n", "<C-Up>", ":resize +2<CR>", { desc = "Increase window height" })
@@ -48,8 +45,6 @@ keymap("n", "<leader>bd", "<cmd>bdelete<CR>", { desc = "Delete buffer" })
 -- Search across all files
 keymap("n", "g/", "<cmd>Telescope live_grep<CR>", { desc = "Search across all files" })
 keymap("n", "<leader>k", "<cmd>Telescope project<CR>", { desc = "Search across all files" })
-
-keymap("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Toggle Claude Code" })
 
 -- Commands to copy file paths
 vim.api.nvim_create_user_command("Crp", function()

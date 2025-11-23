@@ -54,7 +54,7 @@ local applicationHotkeys = {
     n = 'Obsidian',
     m = 'Spotify',
     c = 'Google Chrome',
-    -- s = "Slack"
+    s = "Slack"
 }
 
 -- Set up the regular application hotkeys

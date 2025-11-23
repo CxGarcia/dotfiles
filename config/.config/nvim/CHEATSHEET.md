@@ -30,6 +30,7 @@
 | ---------------------------- | -------------------------------------------- |
 | `<leader>p` or `<leader>ff`  | **Find files** (most used!)                  |
 | `<leader>fb`                 | **Find buffers** (switch between open files) |
+| `<leader>tf`                 | **Find terminals** (list all open terminals) |
 | `<leader>fr`                 | Recent files                                 |
 | `g/`                         | **Search across all files** (live grep) ⚡   |
 | `<leader>fg`                 | Live grep (search text in all files)         |
@@ -53,12 +54,40 @@
 
 ## 📑 BUFFER NAVIGATION
 
-| Keymap       | Action                                          |
-| ------------ | ----------------------------------------------- |
-| `Shift-h`    | **Previous buffer**                             |
-| `Shift-l`    | **Next buffer**                                 |
-| `<leader>fb` | Find buffer (Telescope - best for many buffers) |
-| `<leader>bd` | Delete/close current buffer                     |
+### Three Mental Models for Buffers
+
+**1. Linear List Model** (what Shift-h/l does)
+Think of buffers as a carousel you cycle through:
+```
+[buf1] → [buf2] → [buf3] → [buf4] → (back to buf1)
+```
+
+**2. Jump List Model** (built-in, super useful!)
+Jump to places you've recently been:
+```
+Current → Last → 2nd-to-last → ...
+```
+
+**3. Fuzzy Finder Model** (fastest for many buffers)
+Search and jump directly to any buffer by name.
+
+### Buffer Keymaps
+
+| Keymap        | Action                                             |
+| ------------- | -------------------------------------------------- |
+| `Shift-h`     | Previous buffer (linear cycling)                   |
+| `Shift-l`     | Next buffer (linear cycling)                       |
+| `Ctrl-6`      | **Toggle between last 2 buffers** (use this most!) |
+| `Ctrl-o`      | Jump to older location in jump list                |
+| `Ctrl-i`      | Jump to newer location in jump list                |
+| `<leader>fb`  | Find buffer (Telescope - best for many buffers)    |
+| `<leader>bd`  | Delete/close current buffer                        |
+
+### Recommended Workflow
+
+**80% of the time:** Use `Ctrl-6` to toggle between your two main files
+**When you need a specific file:** Use `<leader>fb` to fuzzy find it
+**When browsing:** Use `Shift-h`/`Shift-l` to cycle through the bufferline
 
 **Tip:** You can also click on buffers in the top bar!
 
@@ -104,6 +133,61 @@
 | `:vsplit` or `:vsp` | Vertical split                   |
 | `:only`             | Close all windows except current |
 | `:q`                | Close current window             |
+
+---
+
+## 💻 TERMINAL MANAGEMENT
+
+### Opening Terminals
+
+| Keymap       | Action                         |
+| ------------ | ------------------------------ |
+| `<leader>tt` | Toggle floating terminal       |
+| `<leader>th` | Toggle horizontal terminal     |
+| `<leader>tv` | Toggle vertical terminal       |
+| `<leader>tn` | Toggle Node REPL               |
+| `<leader>tp` | Toggle Python REPL             |
+| `<leader>cc` | Toggle Claude Code             |
+| `Alt-,`      | Quick toggle Claude Code       |
+
+### Managing Multiple Terminals
+
+| Keymap       | Action                            |
+| ------------ | --------------------------------- |
+| `<leader>tf` | **Find terminals** (Telescope)    |
+| `<leader>t1` | Switch to terminal 1              |
+| `<leader>t2` | Switch to terminal 2              |
+| `<leader>t3` | Switch to terminal 3              |
+| `<leader>t4` | Switch to terminal 4              |
+| `<leader>ta` | Toggle all terminals              |
+
+### Inside Terminal Mode
+
+| Keymap            | Action                          |
+| ----------------- | ------------------------------- |
+| `Esc` or `jk`     | Exit terminal mode (to normal)  |
+| `Ctrl-h/j/k/l`    | Navigate to other windows       |
+| `Ctrl-w`          | Close current terminal          |
+| `Alt-h`           | Toggle horizontal terminal      |
+| `Alt-v`           | Toggle vertical terminal        |
+
+### Terminal Workflow
+
+```
+1. Open floating terminal:     <leader>tt
+2. Run your commands:           (type normally)
+3. Exit to normal mode:         Esc
+4. Navigate to code:            Ctrl-h/j/k/l
+5. Back to terminal:            <leader>tt (toggles)
+6. Need another terminal?       <leader>t2 (opens terminal 2)
+7. Switch between them:         <leader>t1 / <leader>t2
+```
+
+**Tips:**
+- Terminals persist - they don't close when you toggle them, just hide
+- Each terminal (1-4) maintains its own shell session
+- Use floating for quick commands, horizontal/vertical for side-by-side work
+- Terminal 1 is the default when you use `<leader>tt`
 
 ---
 
@@ -190,7 +274,8 @@ Your changes are **always visible** in the left gutter:
 | `ds"`   | Delete surrounding "        | `"hello"` → `hello`    |
 | `ysiw"` | Surround word with "        | `hello` → `"hello"`    |
 | `yss)`  | Surround entire line        | `hello` → `(hello)`    |
-| `gs`    | Surround selection (visual) | Select text then `gs"` |
+| `s`     | Surround selection (visual) | Select text then `s"`  |
+| `S`     | Surround lines (visual)     | Select lines then `S"` |
 
 ### Built-in Text Objects (work everywhere)
 
@@ -347,4 +432,16 @@ da(   - Delete around () (includes parens)
 vif   - Select inside function
 cad   - Change around definition
 vid   - Select inside definition
+```
+
+### Terminal
+
+```
+<leader>tt    - Toggle floating terminal
+<leader>th    - Toggle horizontal terminal
+<leader>tv    - Toggle vertical terminal
+<leader>tf    - Find terminals (Telescope)
+Esc (in term) - Exit terminal mode
+Ctrl-w        - Close terminal
+<leader>t1-4  - Switch between terminals
 ```
