@@ -40,29 +40,57 @@ keymap("n", "<leader>q", "<cmd>q<CR>", { desc = "Quit" })
 -- Buffer navigation
 keymap("n", "<S-h>", "<cmd>bprevious<CR>", { desc = "Previous buffer" })
 keymap("n", "<S-l>", "<cmd>bnext<CR>", { desc = "Next buffer" })
-keymap("n", "<leader>bd", "<cmd>bdelete<CR>", { desc = "Delete buffer" })
+
+-- Smart buffer deletion - switch to next normal buffer before deleting
+local function smart_delete_buffer()
+	local current_buf = vim.api.nvim_get_current_buf()
+	local buffers = vim.api.nvim_list_bufs()
+
+	-- Find the next normal buffer (not NvimTree, terminal, etc.)
+	local normal_buffers = {}
+	for _, buf in ipairs(buffers) do
+		if vim.api.nvim_buf_is_loaded(buf) and buf ~= current_buf then
+			local buftype = vim.api.nvim_buf_get_option(buf, "buftype")
+			local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
+			-- Skip special buffers
+			if buftype == "" and filetype ~= "NvimTree" then
+				table.insert(normal_buffers, buf)
+			end
+		end
+	end
+
+	-- If we have other normal buffers, switch to one before deleting
+	if #normal_buffers > 0 then
+		vim.api.nvim_set_current_buf(normal_buffers[1])
+	end
+
+	-- Delete the original buffer
+	vim.api.nvim_buf_delete(current_buf, { force = false })
+end
+
+keymap("n", "<leader>bd", smart_delete_buffer, { desc = "Delete buffer" })
 
 -- Search across all files
-keymap("n", "g/", "<cmd>Telescope live_grep<CR>", { desc = "Search across all files" })
-keymap("n", "<leader>k", "<cmd>Telescope project<CR>", { desc = "Search across all files" })
+keymap("n", "g/", "<cmd>Telescope egrepify<CR>", { desc = "Search across all files" })
+keymap("n", "<leader>k", "<cmd>Telescope project<CR>", { desc = "Search projects" })
 
 -- Commands to copy file paths
 vim.api.nvim_create_user_command("Crp", function()
-    local path = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
-    if path == "" then
-        vim.notify("No file in current buffer", vim.log.levels.WARN)
-        return
-    end
-    vim.fn.setreg("+", path)
-    vim.notify("Copied relative path: " .. path, vim.log.levels.INFO)
+	local path = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
+	if path == "" then
+		vim.notify("No file in current buffer", vim.log.levels.WARN)
+		return
+	end
+	vim.fn.setreg("+", path)
+	vim.notify("Copied relative path: " .. path, vim.log.levels.INFO)
 end, { desc = "Copy relative path of current buffer" })
 
-vim.api.nvim_create_user_command("Cra", function()
-    local path = vim.fn.expand("%:p")
-    if path == "" then
-        vim.notify("No file in current buffer", vim.log.levels.WARN)
-        return
-    end
-    vim.fn.setreg("+", path)
-    vim.notify("Copied absolute path: " .. path, vim.log.levels.INFO)
+vim.api.nvim_create_user_command("Cap", function()
+	local path = vim.fn.expand("%:p")
+	if path == "" then
+		vim.notify("No file in current buffer", vim.log.levels.WARN)
+		return
+	end
+	vim.fn.setreg("+", path)
+	vim.notify("Copied absolute path: " .. path, vim.log.levels.INFO)
 end, { desc = "Copy absolute path of current buffer" })

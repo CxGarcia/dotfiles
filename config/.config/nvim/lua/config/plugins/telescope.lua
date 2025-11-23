@@ -11,6 +11,13 @@ return {
 				return vim.fn.executable("make") == 1
 			end,
 		},
+		{
+			"nvim-telescope/telescope-frecency.nvim",
+			dependencies = { "kkharji/sqlite.lua" },
+		},
+		{
+			"fdschmidt93/telescope-egrepify.nvim",
+		},
 	},
 	config = function()
 		local telescope = require("telescope")
@@ -22,22 +29,10 @@ return {
 				selection_caret = " ",
 				path_display = { "truncate" },
 				-- Performance optimizations
+				-- Note: ripgrep respects .gitignore by default via --glob flags
 				file_ignore_patterns = {
 					"%.git/",
-					"node_modules/",
-					"%.cache/",
-					"%.venv/",
-					"__pycache__/",
-					"%.next/",
-					"dist/",
-					"build/",
-					"target/",
-					"%.pytest_cache/",
-					"%.idea/",
-					"%.vscode/",
 					"%.DS_Store",
-					"package%-lock%.json",
-					"yarn%.lock",
 				},
 				vimgrep_arguments = {
 					"rg",
@@ -50,6 +45,9 @@ return {
 					"--hidden",
 					"--glob=!.git/",
 				},
+				-- Use fzf for fuzzy finding
+				file_sorter = require("telescope.sorters").get_fzf_sorter,
+				generic_sorter = require("telescope.sorters").get_fzf_sorter,
 				mappings = {
 					i = {
 						["<C-j>"] = actions.move_selection_next,
@@ -58,7 +56,17 @@ return {
 							actions.send_selected_to_qflist(prompt_bufnr)
 							actions.open_qflist(prompt_bufnr)
 						end,
+						-- Send to Trouble for collapsible/foldable groups
+						["<C-t>"] = function(prompt_bufnr)
+							require("trouble.sources.telescope").open(prompt_bufnr)
+						end,
 						["<Esc>"] = actions.close,
+					},
+					n = {
+						-- Also available in normal mode
+						["<C-t>"] = function(prompt_bufnr)
+							require("trouble.sources.telescope").open(prompt_bufnr)
+						end,
 					},
 				},
 			},
@@ -91,17 +99,59 @@ return {
 					},
 					sync_with_nvim_tree = true,
 				},
+				frecency = {
+					show_scores = false,
+					show_unindexed = true,
+					ignore_patterns = { "*.git/*", "*/tmp/*", "*/node_modules/*" },
+					workspaces = {
+						["conf"] = vim.fn.expand("~/.config"),
+						["dev"] = vim.fn.expand("~/dev"),
+						["dotfiles"] = vim.fn.expand("~/dotfiles"),
+					},
+				},
+				egrepify = {
+					-- Enable file grouping (shows filename headers)
+					title = true,
+					filename_hl = "EgrepifyFile",
+					lnum = true,
+					lnum_hl = "EgrepifyLnum",
+					col = false,
+					results_ts_hl = true,
+					-- AND mode: "foo bar" matches foo.*bar
+					AND = true,
+					permutations = false,
+					-- Prefix filters for advanced searches
+					prefixes = {
+						-- Usage examples:
+						-- #lua,md foo   - search only in .lua and .md files
+						-- >conf foo     - search in paths containing "conf"
+						-- &test foo     - search in filenames containing "test"
+						-- !bar foo      - exclude lines containing "bar"
+						["!"] = {
+							flag = "invert-match",
+						},
+					},
+				},
 			},
 		})
 
-		-- Load fzf extension if available
+		-- Load extensions
 		pcall(telescope.load_extension, "fzf")
+		pcall(telescope.load_extension, "frecency")
+		pcall(telescope.load_extension, "egrepify")
 
 		-- Keymaps
 		local keymap = vim.keymap.set
-		keymap("n", "<leader>p", "<cmd>Telescope find_files<CR>", { desc = "Find files" })
+
+		-- File finding: use frecency for intelligent file discovery
+		keymap("n", "<leader>p", "<cmd>Telescope frecency workspace=CWD<CR>", { desc = "Find files (smart)" })
+		keymap("n", "<leader>P", "<cmd>Telescope frecency<CR>", { desc = "Find files (all workspaces)" })
+
 		keymap("n", "<leader>d", "<cmd>Telescope diagnostics<CR>", { desc = "Project diagnostics" })
-		keymap("n", "<leader>fg", "<cmd>Telescope live_grep<CR>", { desc = "Live grep" })
+
+		-- Search: use egrepify for file-grouped results
+		keymap("n", "<leader>fg", "<cmd>Telescope egrepify<CR>", { desc = "Live grep" })
+
 		keymap("n", "<leader>fb", "<cmd>Telescope buffers<CR>", { desc = "Find buffers" })
 		keymap("n", "<leader>fH", "<cmd>Telescope help_tags<CR>", { desc = "Help tags" })
 		keymap("n", "<leader>fr", "<cmd>Telescope oldfiles<CR>", { desc = "Recent files" })

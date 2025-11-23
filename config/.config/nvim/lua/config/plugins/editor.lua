@@ -134,6 +134,8 @@ return {
                     local keymap = vim.keymap.set
 
                     -- Navigate hunks
+                    keymap("n", "]c", gs.next_hunk, { buffer = bufnr, desc = "Next git change" })
+                    keymap("n", "[c", gs.prev_hunk, { buffer = bufnr, desc = "Previous git change" })
                     keymap("n", "]g", gs.next_hunk, { buffer = bufnr, desc = "Next git change" })
                     keymap("n", "[g", gs.prev_hunk, { buffer = bufnr, desc = "Previous git change" })
                     keymap("n", "]h", gs.next_hunk, { buffer = bufnr, desc = "Next hunk" })

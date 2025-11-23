@@ -58,12 +58,14 @@
 
 **1. Linear List Model** (what Shift-h/l does)
 Think of buffers as a carousel you cycle through:
+
 ```
 [buf1] → [buf2] → [buf3] → [buf4] → (back to buf1)
 ```
 
 **2. Jump List Model** (built-in, super useful!)
 Jump to places you've recently been:
+
 ```
 Current → Last → 2nd-to-last → ...
 ```
@@ -73,15 +75,15 @@ Search and jump directly to any buffer by name.
 
 ### Buffer Keymaps
 
-| Keymap        | Action                                             |
-| ------------- | -------------------------------------------------- |
-| `Shift-h`     | Previous buffer (linear cycling)                   |
-| `Shift-l`     | Next buffer (linear cycling)                       |
-| `Ctrl-6`      | **Toggle between last 2 buffers** (use this most!) |
-| `Ctrl-o`      | Jump to older location in jump list                |
-| `Ctrl-i`      | Jump to newer location in jump list                |
-| `<leader>fb`  | Find buffer (Telescope - best for many buffers)    |
-| `<leader>bd`  | Delete/close current buffer                        |
+| Keymap       | Action                                             |
+| ------------ | -------------------------------------------------- |
+| `Shift-h`    | Previous buffer (linear cycling)                   |
+| `Shift-l`    | Next buffer (linear cycling)                       |
+| `Ctrl-6`     | **Toggle between last 2 buffers** (use this most!) |
+| `Ctrl-o`     | Jump to older location in jump list                |
+| `Ctrl-i`     | Jump to newer location in jump list                |
+| `<leader>fb` | Find buffer (Telescope - best for many buffers)    |
+| `<leader>bd` | Delete/close current buffer                        |
 
 ### Recommended Workflow
 
@@ -140,36 +142,36 @@ Search and jump directly to any buffer by name.
 
 ### Opening Terminals
 
-| Keymap       | Action                         |
-| ------------ | ------------------------------ |
-| `<leader>tt` | Toggle floating terminal       |
-| `<leader>th` | Toggle horizontal terminal     |
-| `<leader>tv` | Toggle vertical terminal       |
-| `<leader>tn` | Toggle Node REPL               |
-| `<leader>tp` | Toggle Python REPL             |
-| `<leader>cc` | Toggle Claude Code             |
-| `Alt-,`      | Quick toggle Claude Code       |
+| Keymap       | Action                     |
+| ------------ | -------------------------- |
+| `<leader>tt` | Toggle floating terminal   |
+| `<leader>th` | Toggle horizontal terminal |
+| `<leader>tv` | Toggle vertical terminal   |
+| `<leader>tn` | Toggle Node REPL           |
+| `<leader>tp` | Toggle Python REPL         |
+| `<leader>cc` | Toggle Claude Code         |
+| `Alt-,`      | Quick toggle Claude Code   |
 
 ### Managing Multiple Terminals
 
-| Keymap       | Action                            |
-| ------------ | --------------------------------- |
-| `<leader>tf` | **Find terminals** (Telescope)    |
-| `<leader>t1` | Switch to terminal 1              |
-| `<leader>t2` | Switch to terminal 2              |
-| `<leader>t3` | Switch to terminal 3              |
-| `<leader>t4` | Switch to terminal 4              |
-| `<leader>ta` | Toggle all terminals              |
+| Keymap       | Action                         |
+| ------------ | ------------------------------ |
+| `<leader>tf` | **Find terminals** (Telescope) |
+| `<leader>t1` | Switch to terminal 1           |
+| `<leader>t2` | Switch to terminal 2           |
+| `<leader>t3` | Switch to terminal 3           |
+| `<leader>t4` | Switch to terminal 4           |
+| `<leader>ta` | Toggle all terminals           |
 
 ### Inside Terminal Mode
 
-| Keymap            | Action                          |
-| ----------------- | ------------------------------- |
-| `Esc` or `jk`     | Exit terminal mode (to normal)  |
-| `Ctrl-h/j/k/l`    | Navigate to other windows       |
-| `Ctrl-w`          | Close current terminal          |
-| `Alt-h`           | Toggle horizontal terminal      |
-| `Alt-v`           | Toggle vertical terminal        |
+| Keymap         | Action                         |
+| -------------- | ------------------------------ |
+| `Esc` or `jk`  | Exit terminal mode (to normal) |
+| `Ctrl-h/j/k/l` | Navigate to other windows      |
+| `Ctrl-w`       | Close current terminal         |
+| `Alt-h`        | Toggle horizontal terminal     |
+| `Alt-v`        | Toggle vertical terminal       |
 
 ### Terminal Workflow
 
@@ -184,6 +186,7 @@ Search and jump directly to any buffer by name.
 ```
 
 **Tips:**
+
 - Terminals persist - they don't close when you toggle them, just hide
 - Each terminal (1-4) maintains its own shell session
 - Use floating for quick commands, horizontal/vertical for side-by-side work
@@ -359,10 +362,10 @@ Your changes are **always visible** in the left gutter:
 
 ### Utility Commands
 
-| Command | Action                                    |
-| ------- | ----------------------------------------- |
-| `:Crp`  | Copy relative path of current file        |
-| `:Cra`  | Copy absolute path of current file        |
+| Command | Action                             |
+| ------- | ---------------------------------- |
+| `:Crp`  | Copy relative path of current file |
+| `:Cap`  | Copy absolute path of current file |
 
 ### Visual Mode
 

@@ -108,6 +108,13 @@ function ts() {
         return 1
     fi
 
+    # If inside tmux, use tmux popup for better integration
+    if [ -n "$TMUX" ]; then
+        tmux display-popup -E -w 60% -h 60% -b none "sesh connect \"\$(sesh list | fzf --border=rounded --border-label=' Sessions ' --prompt='❯ ' --pointer='▶' --color=bg+:#252c33,bg:#252c33,spinner:#9ccfd8,hl:#ebbcba --color=fg:#e0def4,header:#eb6f92,info:#c4a7e7,pointer:#9ccfd8 --color=marker:#eb6f92,fg+:#e0def4,prompt:#c4a7e7,hl+:#ebbcba --color=border:#6e6a86 --no-preview --bind='ctrl-d:execute(tmux kill-session -t {})+reload(sesh list)')\""
+        return
+    fi
+
+    # Outside tmux, use regular fzf
     local session=$(
         sesh list | \
         fzf \
@@ -133,9 +140,9 @@ function ts() {
 # Changed from Ctrl-s to free up Ctrl keys for applications
 bindkey -s '\es' 'ts\n'
 
-# Ctrl-Space to open tmux session switcher (matches tmux binding for consistency)
-# This allows Ctrl-Space to work both inside and outside tmux
-bindkey -s '^ ' 'ts\n'
+# Option-Space to open tmux session switcher (matches tmux binding for consistency)
+# This allows Option-Space to work both inside and outside tmux, freeing Ctrl-Space for Telescope
+bindkey -s '\e ' 'ts\n'
 
 # tkill: Kill all active tmux sessions
 function tkill() {

@@ -78,6 +78,10 @@ return {
                     vim.lsp.buf.definition()
                 end, vim.tbl_extend("force", opts, { desc = "Go to definition" }))
 
+                keymap("n", "gy", function()
+                    vim.lsp.buf.type_definition()
+                end, vim.tbl_extend("force", opts, { desc = "Go to type definition" }))
+
                 -- Hover with documentation + diagnostics
                 local function hover_with_diagnostics()
                     -- Show diagnostics first
@@ -106,6 +110,7 @@ return {
                 keymap("n", "K", hover_with_diagnostics, vim.tbl_extend("force", opts, { desc = "Hover with diagnostics" }))
                 keymap("n", "gh", hover_with_diagnostics, vim.tbl_extend("force", opts, { desc = "Hover with diagnostics" }))
                 keymap("n", "gi", vim.lsp.buf.implementation, vim.tbl_extend("force", opts, { desc = "Go to implementation" }))
+                keymap("n", "gI", vim.lsp.buf.implementation, vim.tbl_extend("force", opts, { desc = "Go to implementation" }))
                 keymap("n", "<leader>k", vim.lsp.buf.signature_help, vim.tbl_extend("force", opts, { desc = "Signature help" }))
                 keymap("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Go to references" }))
                 keymap("n", "<leader>rn", vim.lsp.buf.rename, vim.tbl_extend("force", opts, { desc = "Rename symbol" }))
@@ -355,10 +360,15 @@ return {
                     ["<C-e>"] = cmp.mapping.abort(),
                     ["<CR>"] = cmp.mapping.confirm({ select = true }),
                     ["<Tab>"] = cmp.mapping(function(fallback)
-                        -- Check for Copilot suggestion first
-                        local copilot_keys = vim.fn["copilot#Accept"]()
-                        if copilot_keys ~= "" then
-                            vim.fn.feedkeys(copilot_keys, "")
+                        -- Check for Copilot suggestion (non-blocking check)
+                        local copilot_suggestion = vim.fn["copilot#GetDisplayedSuggestion"]()
+                        if copilot_suggestion.text ~= "" then
+                            -- Accept the suggestion using expression mapping (non-blocking)
+                            vim.api.nvim_feedkeys(
+                                vim.fn["copilot#Accept"]("\t"),
+                                "n",
+                                true
+                            )
                         elseif luasnip.expand_or_jumpable() then
                             luasnip.expand_or_jump()
                         elseif cmp.visible() then
@@ -533,11 +543,11 @@ return {
         config = function()
             require("conform").setup({
                 formatters_by_ft = {
-                    go = { "gofumpt", "goimports_reviser" },
-                    javascript = { "prettier" },
-                    typescript = { "prettier" },
-                    javascriptreact = { "prettier" },
-                    typescriptreact = { "prettier" },
+                    go = { "goimports", "gofumpt" },
+                    javascript = { "prettier", "eslint_d" },
+                    typescript = { "prettier", "eslint_d" },
+                    javascriptreact = { "prettier", "eslint_d" },
+                    typescriptreact = { "prettier", "eslint_d" },
                     json = { "prettier" },
                     jsonc = { "prettier" },
                     yaml = { "prettier" },
@@ -576,8 +586,8 @@ return {
         config = function()
             require("mason-tool-installer").setup({
                 ensure_installed = {
+                    "goimports",
                     "gofumpt",
-                    "goimports-reviser",
                     "prettier",
                     "eslint_d",
                     "stylua"
