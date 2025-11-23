@@ -1,4 +1,12 @@
 -- Completion configuration: nvim-cmp + Copilot + LuaSnip integration
+--
+-- ARCHITECTURE DECISION:
+-- Tab key prioritizes Copilot ghost text when visible, then falls back to cmp menu navigation.
+-- With hide_during_completion = true, only one system is visible at a time:
+-- - Ghost text shows when no cmp menu (fast, immediate suggestions)
+-- - cmp menu shows when triggered (LSP, snippets, etc.) and hides ghost text
+-- This prevents visual conflicts while preserving Tab-to-accept Copilot muscle memory.
+--
 return {
 	-- nvim-cmp: Completion plugin with LSP support
 	{
@@ -15,9 +23,14 @@ return {
 		config = function()
 			local cmp = require("cmp")
 			local luasnip = require("luasnip")
-			local copilot = require("copilot.suggestion")
+			local has_copilot, copilot = pcall(require, "copilot.suggestion")
 
 			cmp.setup({
+				-- Auto-select first completion item
+				preselect = cmp.PreselectMode.Item,
+				completion = {
+					completeopt = "menu,menuone,noinsert",
+				},
 				snippet = {
 					expand = function(args)
 						luasnip.lsp_expand(args.body)
@@ -26,16 +39,12 @@ return {
 				mapping = cmp.mapping.preset.insert({
 					-- Tab: Copilot → cmp menu → snippet → fallback
 					["<Tab>"] = cmp.mapping(function(fallback)
-						-- Priority 1: Accept Copilot ghost text if visible (and cmp menu not open)
-						if copilot.is_visible() and not cmp.visible() then
+						if has_copilot and copilot.is_visible() then
 							copilot.accept()
-						-- Priority 2: Navigate cmp menu when open
 						elseif cmp.visible() then
 							cmp.select_next_item()
-						-- Priority 3: Jump through snippet placeholders
 						elseif luasnip.locally_jumpable(1) then
 							luasnip.jump(1)
-						-- Fallback: Regular tab behavior
 						else
 							fallback()
 						end
@@ -52,11 +61,15 @@ return {
 						end
 					end, { "i", "s" }),
 
+					-- Arrow keys: Navigate cmp menu
+					["<Down>"] = cmp.mapping.select_next_item(),
+					["<Up>"] = cmp.mapping.select_prev_item(),
+
 					-- Ctrl+Space: Manually trigger completion
 					["<C-Space>"] = cmp.mapping.complete(),
 
-					-- Enter: Confirm selection
-					["<CR>"] = cmp.mapping.confirm({ select = false }),
+					-- Enter: Confirm selection (auto-selects first item if nothing selected)
+					["<CR>"] = cmp.mapping.confirm({ select = true }),
 
 					-- Ctrl+e: Close completion menu
 					["<C-e>"] = cmp.mapping.abort(),

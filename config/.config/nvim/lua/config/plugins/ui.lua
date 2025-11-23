@@ -88,6 +88,7 @@ return {
     -- File explorer
     {
         "nvim-tree/nvim-tree.lua",
+        lazy = false, -- Load immediately to hijack directory opens (nvim .)
         dependencies = { "nvim-tree/nvim-web-devicons" },
         config = function()
             require("nvim-tree").setup({

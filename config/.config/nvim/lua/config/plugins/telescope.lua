@@ -12,6 +12,14 @@ return {
 			end,
 		},
 		{
+			"danielfalk/smart-open.nvim",
+			branch = "0.2.x",
+			dependencies = {
+				"kkharji/sqlite.lua",
+				{ "nvim-telescope/telescope-fzf-native.nvim" },
+			},
+		},
+		{
 			"nvim-telescope/telescope-frecency.nvim",
 			dependencies = { "kkharji/sqlite.lua" },
 		},
@@ -75,6 +83,16 @@ return {
 					hidden = true,
 					-- Use fd for much faster file finding (install with: brew install fd)
 					find_command = { "fd", "--type", "f", "--strip-cwd-prefix", "--hidden", "--exclude", ".git" },
+					path_display = { "smart" }, -- Smart path display for better UX
+				},
+				buffers = {
+					path_display = { "smart" },
+					sort_mru = true,
+					ignore_current_buffer = false,
+				},
+				oldfiles = {
+					path_display = { "smart" },
+					only_cwd = false,
 				},
 				lsp_references = {
 					-- Show only filename:line:col in list, full preview on right
@@ -93,6 +111,24 @@ return {
 				},
 			},
 			extensions = {
+				fzf = {
+					fuzzy = true, -- false will only do exact matching
+					override_generic_sorter = true, -- override the generic sorter
+					override_file_sorter = true, -- override the file sorter
+					case_mode = "smart_case", -- or "ignore_case" or "respect_case"
+				},
+				smart_open = {
+					cwd_only = false, -- Allow searching outside CWD but prioritize it
+					filename_first = true, -- Show filename before directory path
+					match_algorithm = "fzf", -- Use fzf for optimal path matching
+					show_hidden = true, -- Show hidden files (consistent with find_files config)
+					ignore_patterns = {
+						"*.git/*",
+						"*/tmp/*",
+						"*/node_modules/*",
+						"*.DS_Store",
+					},
+				},
 				frecency = {
 					show_scores = false,
 					show_unindexed = true,
@@ -102,6 +138,8 @@ return {
 						["dev"] = vim.fn.expand("~/dev"),
 						["dotfiles"] = vim.fn.expand("~/dotfiles"),
 					},
+					default_workspace = "CWD", -- Default to current directory
+					auto_validate = false, -- Don't auto-validate DB for performance
 				},
 				egrepify = {
 					-- Enable file grouping (shows filename headers)
@@ -129,17 +167,37 @@ return {
 			},
 		})
 
-		-- Load extensions
+		-- Load extensions in optimal order
+		-- 1. fzf first (provides sorting for others)
 		pcall(telescope.load_extension, "fzf")
+
+		-- 2. smart-open (primary file finder)
+		pcall(telescope.load_extension, "smart_open")
+
+		-- 3. frecency (secondary, workspace-aware finder)
 		pcall(telescope.load_extension, "frecency")
+
+		-- 4. Other extensions
 		pcall(telescope.load_extension, "egrepify")
 
 		-- Keymaps
 		local keymap = vim.keymap.set
 
-		-- File finding: use frecency for intelligent file discovery
-		keymap("n", "<leader>p", "<cmd>Telescope frecency workspace=CWD<CR>", { desc = "Find files (smart)" })
-		keymap("n", "<leader>P", "<cmd>Telescope frecency<CR>", { desc = "Find files (all workspaces)" })
+		-- File finding: use smart-open for intelligent file discovery with better path matching
+		keymap("n", "<leader>p", function()
+			require("telescope").extensions.smart_open.smart_open({
+				cwd_only = true, -- Scope to current working directory
+				filename_first = true,
+			})
+		end, { desc = "Find files (smart)" })
+
+		-- Global smart-open across all known locations
+		keymap("n", "<leader>P", function()
+			require("telescope").extensions.smart_open.smart_open({
+				cwd_only = false, -- Search everywhere
+				filename_first = true,
+			})
+		end, { desc = "Find files (global smart)" })
 
 		keymap("n", "<leader>d", "<cmd>Telescope diagnostics<CR>", { desc = "Project diagnostics" })
 

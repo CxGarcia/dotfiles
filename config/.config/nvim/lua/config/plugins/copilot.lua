@@ -10,7 +10,7 @@ return {
 				suggestion = {
 					enabled = true,
 					auto_trigger = true,
-					hide_during_completion = true,
+					hide_during_completion = true, -- Hide ghost text when cmp menu opens (prevents visual conflicts)
 					debounce = 75,
 					keymap = {
 						accept = false, -- We'll handle Tab manually
@@ -25,32 +25,13 @@ return {
 
 				-- Filetypes to disable Copilot in
 				filetypes = {
-					yaml = false,
-					markdown = false,
-					help = false,
-					gitcommit = false,
-					gitrebase = false,
-					hgcommit = false,
-					svn = false,
-					cvs = false,
-					["."] = false,
-					-- SECURITY: Disable in files that commonly contain secrets
-					[".env"] = false,
-					env = false,
-					json = false, -- May contain secrets in config files
-					conf = false,
-					config = false,
-					-- Shell scripts may contain hardcoded credentials
-					sh = false,
-					bash = false,
-					zsh = false,
+					[".env"] = false, -- Environment files with secrets
+					gitcommit = false, -- Git commits should be written by the user
+					help = false, -- Help files are documentation
 				},
 
-				-- Node.js configuration (use absolute path for security)
-				copilot_node_command = vim.fn.exepath("node") ~= "" and vim.fn.exepath("node") or "node",
-
-				-- Server options
-				server_opts_overrides = {},
+				-- Node.js configuration
+				copilot_node_command = vim.fn.exepath("node"),
 			})
 		end,
 	},
