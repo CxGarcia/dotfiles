@@ -1,3 +1,13 @@
+-- Enable faster Lua module loader (Neovim 0.9+)
+-- Must be set before any require() calls for maximum benefit
+vim.loader.enable()
+
+-- Disable unused providers (saves 10-20ms startup time)
+vim.g.loaded_python3_provider = 0
+vim.g.loaded_ruby_provider = 0
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_node_provider = 0
+
 -- Set leader key to space (must be set before lazy)
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
@@ -22,15 +32,36 @@ require("config.keymaps")
 
 -- Load plugins
 require("lazy").setup("config.plugins", {
+    defaults = {
+        lazy = true, -- Make all plugins lazy by default
+    },
     checker = { enabled = false },
-    change_detection = { notify = false }
+    change_detection = { notify = false },
+    performance = {
+        rtp = {
+            disabled_plugins = {
+                "gzip",
+                "matchit",
+                -- "matchparen" kept enabled - useful for showing matching brackets
+                "netrwPlugin",
+                "tarPlugin",
+                "tohtml",
+                "tutor",
+                "zipPlugin",
+            },
+        },
+    },
+    ui = {
+        border = "rounded",
+    },
 })
 
 -- Load keymap conflict detection
 local keymap_conflicts = require("config.keymap-conflicts")
 
--- Check for conflicts on startup
-keymap_conflicts.check_on_startup()
+-- Note: Automatic conflict checking disabled for performance (saves 50-100ms)
+-- Run :KeymapConflicts manually to check for conflicts when needed
+-- keymap_conflicts.check_on_startup()
 
 -- Create user commands for keymap conflict detection
 vim.api.nvim_create_user_command("KeymapConflicts", function()

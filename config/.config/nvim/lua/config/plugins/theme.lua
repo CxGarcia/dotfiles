@@ -1,6 +1,8 @@
 return {
     "rose-pine/neovim",
     name = "rose-pine",
+    lazy = false,   -- Load immediately on startup
+    priority = 1000, -- Load before other plugins to prevent undefined colors
     config = function()
         local bg = "#252c33"
         local bg_highlight = "#2d3843"
