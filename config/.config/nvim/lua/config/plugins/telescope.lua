@@ -2,6 +2,8 @@
 return {
 	"nvim-telescope/telescope.nvim",
 	branch = "0.1.x",
+	lazy = false, -- Load immediately so keymaps are available
+	priority = 100, -- Load after UI but before most plugins
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		{

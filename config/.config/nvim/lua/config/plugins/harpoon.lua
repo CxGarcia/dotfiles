@@ -1,6 +1,8 @@
 return {
 	"ThePrimeagen/harpoon",
 	branch = "harpoon2",
+	lazy = false, -- Load immediately so keymaps are available
+	priority = 100, -- Load after UI but before most plugins
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		"nvim-telescope/telescope.nvim",

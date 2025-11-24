@@ -2,7 +2,8 @@
 return {
     "nvim-treesitter/nvim-treesitter",
     build = ":TSUpdate",
-    event = { "BufReadPost", "BufNewFile" },
+    lazy = false, -- Load immediately for syntax highlighting
+    priority = 500, -- Load after theme but before other plugins
     dependencies = {
         "nvim-treesitter/nvim-treesitter-textobjects",
         "RRethy/nvim-treesitter-textsubjects"
