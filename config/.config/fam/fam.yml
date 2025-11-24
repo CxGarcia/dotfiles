@@ -5,9 +5,9 @@ projects:
   - name: nutria
     path: ~/dev/nutria
     workflow_path: fe_base.yml
-  - name: tst
-    path: ~/dev/fam
-    workflow_path: ~/dev/fam/testutils/fixtures/test-session-simple.yml
+  - name: web
+    path: ~/dev/nest/websites/web
+    workflow_path: fe_base.yml
 daemon:
   log_level: info
   max_concurrent_workflows: 20

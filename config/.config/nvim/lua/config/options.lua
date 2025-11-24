@@ -1,6 +1,9 @@
 -- Core Neovim Options
 local opt = vim.opt
 
+-- Enable syntax highlighting (required for Treesitter)
+vim.cmd("syntax on")
+
 -- Line numbers
 opt.number = true
 opt.relativenumber = true

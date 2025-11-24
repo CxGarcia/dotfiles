@@ -2,7 +2,7 @@
 return {
 	-- Mason - LSP server installer (must be set up first)
 	{
-		"williamboman/mason.nvim",
+		"mason-org/mason.nvim",
 		cmd = "Mason",
 		build = ":MasonUpdate",
 		config = function()
@@ -21,9 +21,9 @@ return {
 
 	-- Mason-lspconfig bridge (must be after mason)
 	{
-		"williamboman/mason-lspconfig.nvim",
-		dependencies = { "williamboman/mason.nvim" },
-		event = { "BufReadPost", "BufNewFile" },
+		"mason-org/mason-lspconfig.nvim",
+		dependencies = { "mason-org/mason.nvim" },
+		event = { "BufReadPre", "BufNewFile" }, -- Load when opening files
 		config = function()
 			require("mason-lspconfig").setup({
 				ensure_installed = {
@@ -33,6 +33,7 @@ return {
 					"lua_ls", -- Lua
 				},
 				automatic_installation = true,
+				automatic_enable = false, -- Disable auto vim.lsp.enable() - we handle it manually
 			})
 		end,
 	},
@@ -47,12 +48,12 @@ return {
 	{
 		"neovim/nvim-lspconfig",
 		dependencies = {
-			"williamboman/mason.nvim",
-			"williamboman/mason-lspconfig.nvim",
+			"mason-org/mason.nvim",
+			"mason-org/mason-lspconfig.nvim",
 			"folke/neodev.nvim",
 			"hrsh7th/cmp-nvim-lsp",
 		},
-		event = { "BufReadPost", "BufNewFile" },
+		event = { "BufReadPre", "BufNewFile" }, -- Load when opening files
 		config = function()
 			-- LSP capabilities with nvim-cmp support
 			local capabilities = vim.lsp.protocol.make_client_capabilities()
@@ -335,35 +336,11 @@ return {
 				},
 			}
 
-			-- Enable LSP servers for appropriate filetypes
-			local function setup_go()
-				vim.lsp.enable("gopls")
-			end
-
-			local function setup_typescript()
-				vim.lsp.enable("ts_ls")
-				vim.lsp.enable("eslint")
-			end
-
-			local function setup_lua()
-				vim.lsp.enable("lua_ls")
-			end
-
-			-- Use FileType autocmds with proper filetype patterns
-			vim.api.nvim_create_autocmd("FileType", {
-				pattern = { "go", "gomod", "gowork", "gotmpl" },
-				callback = setup_go,
-			})
-
-			vim.api.nvim_create_autocmd("FileType", {
-				pattern = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
-				callback = setup_typescript,
-			})
-
-			vim.api.nvim_create_autocmd("FileType", {
-				pattern = "lua",
-				callback = setup_lua,
-			})
+			-- Enable LSP servers (vim.lsp.enable handles FileType autocmds automatically)
+			vim.lsp.enable('gopls')
+			vim.lsp.enable('ts_ls')
+			vim.lsp.enable('eslint')
+			vim.lsp.enable('lua_ls')
 		end,
 	},
 
@@ -538,7 +515,7 @@ return {
 	-- Mason-tool-installer for formatters
 	{
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
-		dependencies = { "williamboman/mason.nvim" },
+		dependencies = { "mason-org/mason.nvim" },
 		config = function()
 			require("mason-tool-installer").setup({
 				ensure_installed = {

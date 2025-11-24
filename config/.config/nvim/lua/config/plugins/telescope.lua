@@ -2,8 +2,73 @@
 return {
 	"nvim-telescope/telescope.nvim",
 	branch = "0.1.x",
-	lazy = false, -- Load immediately so keymaps are available
-	priority = 100, -- Load after UI but before most plugins
+	keys = {
+		-- File finding: use smart-open for intelligent file discovery with better path matching
+		{
+			"<leader>p",
+			function()
+				require("telescope").extensions.smart_open.smart_open({
+					cwd_only = true, -- Scope to current working directory
+					filename_first = true,
+				})
+			end,
+			desc = "Find files (smart)",
+		},
+
+		-- Global smart-open across all known locations
+		{
+			"<leader>P",
+			function()
+				require("telescope").extensions.smart_open.smart_open({
+					cwd_only = false, -- Search everywhere
+					filename_first = true,
+				})
+			end,
+			desc = "Find files (global smart)",
+		},
+
+		{ "<leader>d", "<cmd>Telescope diagnostics<CR>", desc = "Project diagnostics" },
+
+		-- Search: use egrepify for file-grouped results
+		{ "<leader>fg", "<cmd>Telescope egrepify<CR>", desc = "Live grep" },
+
+		{ "<leader>fb", "<cmd>Telescope buffers<CR>", desc = "Find buffers" },
+		{ "<leader>fH", "<cmd>Telescope help_tags<CR>", desc = "Help tags" },
+		{ "<leader>fr", "<cmd>Telescope oldfiles<CR>", desc = "Recent files" },
+		{ "<leader>fc", "<cmd>Telescope grep_string<CR>", desc = "Find string under cursor" },
+		{ "<leader>fs", "<cmd>Telescope lsp_document_symbols<CR>", desc = "Document symbols" },
+		{ "<leader>fS", "<cmd>Telescope lsp_workspace_symbols<CR>", desc = "Workspace symbols" },
+
+		-- LSP references
+		{ "ga", "<cmd>Telescope lsp_references<CR>", desc = "LSP references" },
+		{ "gA", "<cmd>Telescope lsp_references<CR>", desc = "LSP references" },
+
+		-- Git
+		{ "<leader>gc", "<cmd>Telescope git_status<CR>", desc = "Git changed files" },
+
+		-- Terminals - custom picker to show only terminal buffers
+		{
+			"<leader>tf",
+			function()
+				require("telescope.builtin").buffers({
+					prompt_title = "Find Terminals",
+					only_cwd = false,
+					attach_mappings = function(_, map)
+						-- Keep default mappings
+						return true
+					end,
+					-- Filter to show only terminal buffers
+					entry_maker = function(entry)
+						local bufnr = entry.bufnr
+						if vim.api.nvim_buf_get_option(bufnr, "buftype") == "terminal" then
+							return require("telescope.make_entry").gen_from_buffer()(entry)
+						end
+					end,
+				})
+			end,
+			desc = "Find terminals",
+		},
+	},
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		{
@@ -181,62 +246,5 @@ return {
 
 		-- 4. Other extensions
 		pcall(telescope.load_extension, "egrepify")
-
-		-- Keymaps
-		local keymap = vim.keymap.set
-
-		-- File finding: use smart-open for intelligent file discovery with better path matching
-		keymap("n", "<leader>p", function()
-			require("telescope").extensions.smart_open.smart_open({
-				cwd_only = true, -- Scope to current working directory
-				filename_first = true,
-			})
-		end, { desc = "Find files (smart)" })
-
-		-- Global smart-open across all known locations
-		keymap("n", "<leader>P", function()
-			require("telescope").extensions.smart_open.smart_open({
-				cwd_only = false, -- Search everywhere
-				filename_first = true,
-			})
-		end, { desc = "Find files (global smart)" })
-
-		keymap("n", "<leader>d", "<cmd>Telescope diagnostics<CR>", { desc = "Project diagnostics" })
-
-		-- Search: use egrepify for file-grouped results
-		keymap("n", "<leader>fg", "<cmd>Telescope egrepify<CR>", { desc = "Live grep" })
-
-		keymap("n", "<leader>fb", "<cmd>Telescope buffers<CR>", { desc = "Find buffers" })
-		keymap("n", "<leader>fH", "<cmd>Telescope help_tags<CR>", { desc = "Help tags" })
-		keymap("n", "<leader>fr", "<cmd>Telescope oldfiles<CR>", { desc = "Recent files" })
-		keymap("n", "<leader>fc", "<cmd>Telescope grep_string<CR>", { desc = "Find string under cursor" })
-		keymap("n", "<leader>fs", "<cmd>Telescope lsp_document_symbols<CR>", { desc = "Document symbols" })
-		keymap("n", "<leader>fS", "<cmd>Telescope lsp_workspace_symbols<CR>", { desc = "Workspace symbols" })
-
-		-- LSP references
-		keymap("n", "ga", "<cmd>Telescope lsp_references<CR>", { desc = "LSP references" })
-		keymap("n", "gA", "<cmd>Telescope lsp_references<CR>", { desc = "LSP references" })
-
-		-- Git
-		keymap("n", "<leader>gc", "<cmd>Telescope git_status<CR>", { desc = "Git changed files" })
-
-		-- Terminals - custom picker to show only terminal buffers
-		keymap("n", "<leader>tf", function()
-			require("telescope.builtin").buffers({
-				prompt_title = "Find Terminals",
-				only_cwd = false,
-				attach_mappings = function(_, map)
-					-- Keep default mappings
-					return true
-				end,
-				-- Filter to show only terminal buffers
-				entry_maker = function(entry)
-					local bufnr = entry.bufnr
-					if vim.api.nvim_buf_get_option(bufnr, "buftype") == "terminal" then
-						return require("telescope.make_entry").gen_from_buffer()(entry)
-					end
-				end,
-			})
-		end, { desc = "Find terminals" })
 	end,
 }
