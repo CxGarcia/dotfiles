@@ -45,8 +45,16 @@ return {
 	},
 
 	-- LSP Configuration using new vim.lsp.config API (Neovim 0.11+)
+	-- Note: This configuration requires Neovim 0.11+ for vim.lsp.config/enable APIs
 	{
 		"neovim/nvim-lspconfig",
+		cond = function()
+			if vim.fn.has("nvim-0.11") == 0 then
+				vim.notify("LSP config requires Neovim 0.11+. Please upgrade.", vim.log.levels.WARN)
+				return false
+			end
+			return true
+		end,
 		dependencies = {
 			"mason-org/mason.nvim",
 			"mason-org/mason-lspconfig.nvim",
@@ -142,7 +150,7 @@ return {
 				)
 				keymap(
 					"n",
-					"<leader>k",
+					"<leader>K",
 					vim.lsp.buf.signature_help,
 					vim.tbl_extend("force", opts, { desc = "Signature help" })
 				)
@@ -161,7 +169,7 @@ return {
 				keymap("n", "g]", vim.diagnostic.goto_next, vim.tbl_extend("force", opts, { desc = "Next diagnostic" }))
 				keymap(
 					"n",
-					"<leader>q",
+					"<leader>xq",
 					vim.diagnostic.setloclist,
 					vim.tbl_extend("force", opts, { desc = "Quickfix diagnostics" })
 				)
@@ -282,11 +290,13 @@ return {
 						vim.api.nvim_create_autocmd("BufWritePre", {
 							buffer = bufnr,
 							callback = function()
-								-- Use pcall to safely execute the command
-								local ok, _ = pcall(vim.cmd, "EslintFixAll")
+								local ok, err = pcall(vim.cmd, "EslintFixAll")
 								if not ok then
-									-- Silently fail if command doesn't exist yet
-									-- This can happen if ESLint hasn't fully initialized
+									-- Only warn for real errors, not "command not found" during init
+									local err_str = tostring(err)
+									if not err_str:match("E492") and not err_str:match("Not an editor command") then
+										vim.notify("ESLint: " .. err_str, vim.log.levels.WARN)
+									end
 								end
 							end,
 						})

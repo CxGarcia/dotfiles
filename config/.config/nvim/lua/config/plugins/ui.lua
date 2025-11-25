@@ -112,7 +112,8 @@ return {
                 },
                 filters = {
                     dotfiles = false,
-                    custom = { "^.git$" }
+                    git_ignored = false, -- Show gitignored files (like .env)
+                    custom = { "^.git$", "^node_modules$", "^.DS_Store$" }
                 }
             })
 

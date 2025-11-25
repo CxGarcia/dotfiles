@@ -36,7 +36,11 @@ require("lazy").setup("config.plugins", {
     defaults = {
         lazy = true, -- Make all plugins lazy by default
     },
-    checker = { enabled = false },
+    checker = {
+        enabled = true,
+        frequency = 604800, -- Check weekly (in seconds)
+        notify = false, -- Don't notify on startup, check manually with :Lazy check
+    },
     change_detection = { notify = false },
     performance = {
         rtp = {

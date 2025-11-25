@@ -27,7 +27,7 @@ return {
 			desc = "Find files (global smart)",
 		},
 
-		{ "<leader>d", "<cmd>Telescope diagnostics<CR>", desc = "Project diagnostics" },
+		-- Note: <leader>d is mapped to Trouble diagnostics in lsp.lua (more powerful)
 
 		-- Search: use egrepify for file-grouped results
 		{ "<leader>fg", "<cmd>Telescope egrepify<CR>", desc = "Live grep" },
@@ -87,10 +87,6 @@ return {
 			},
 		},
 		{
-			"nvim-telescope/telescope-frecency.nvim",
-			dependencies = { "kkharji/sqlite.lua" },
-		},
-		{
 			"fdschmidt93/telescope-egrepify.nvim",
 		},
 	},
@@ -104,10 +100,12 @@ return {
 				selection_caret = " ",
 				path_display = { "truncate" },
 				-- Performance optimizations
-				-- Note: ripgrep respects .gitignore by default via --glob flags
+				-- Note: Using --no-ignore-vcs to show gitignored files (like .env)
+				-- while manually excluding directories we never want to search
 				file_ignore_patterns = {
 					"%.git/",
 					"%.DS_Store",
+					"node_modules/",
 				},
 				vimgrep_arguments = {
 					"rg",
@@ -118,7 +116,10 @@ return {
 					"--column",
 					"--smart-case",
 					"--hidden",
+					"--no-ignore-vcs", -- Show gitignored files (like .env)
 					"--glob=!.git/",
+					"--glob=!node_modules/",
+					"--glob=!.DS_Store",
 				},
 				-- Use fzf for fuzzy finding
 				file_sorter = require("telescope.sorters").get_fzf_sorter,
@@ -148,8 +149,14 @@ return {
 			pickers = {
 				find_files = {
 					hidden = true,
-					-- Use fd for much faster file finding (install with: brew install fd)
-					find_command = { "fd", "--type", "f", "--strip-cwd-prefix", "--hidden", "--exclude", ".git" },
+					-- Use fd for file finding. --no-ignore-vcs shows gitignored files (like .env)
+					find_command = {
+						"fd", "--type", "f", "--strip-cwd-prefix", "--hidden",
+						"--no-ignore-vcs", -- Show gitignored files
+						"--exclude", ".git",
+						"--exclude", "node_modules",
+						"--exclude", ".DS_Store",
+					},
 					path_display = { "smart" }, -- Smart path display for better UX
 				},
 				buffers = {
@@ -196,18 +203,6 @@ return {
 						"*.DS_Store",
 					},
 				},
-				frecency = {
-					show_scores = false,
-					show_unindexed = true,
-					ignore_patterns = { "*.git/*", "*/tmp/*", "*/node_modules/*" },
-					workspaces = {
-						["conf"] = vim.fn.expand("~/.config"),
-						["dev"] = vim.fn.expand("~/dev"),
-						["dotfiles"] = vim.fn.expand("~/dotfiles"),
-					},
-					default_workspace = "CWD", -- Default to current directory
-					auto_validate = false, -- Don't auto-validate DB for performance
-				},
 				egrepify = {
 					-- Enable file grouping (shows filename headers)
 					title = true,
@@ -241,10 +236,7 @@ return {
 		-- 2. smart-open (primary file finder)
 		pcall(telescope.load_extension, "smart_open")
 
-		-- 3. frecency (secondary, workspace-aware finder)
-		pcall(telescope.load_extension, "frecency")
-
-		-- 4. Other extensions
+		-- 3. Other extensions
 		pcall(telescope.load_extension, "egrepify")
 	end,
 }
