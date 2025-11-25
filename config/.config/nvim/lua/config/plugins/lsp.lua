@@ -147,11 +147,6 @@ return {
 					vim.tbl_extend("force", opts, { desc = "Signature help" })
 				)
 				keymap("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Go to references" }))
-				keymap("n", "<leader>rn", vim.lsp.buf.rename, vim.tbl_extend("force", opts, { desc = "Rename symbol" }))
-				-- cd for "change definition" - uses inc-rename for live preview
-				keymap("n", "cd", function()
-					return ":IncRename " .. vim.fn.expand("<cword>")
-				end, vim.tbl_extend("force", opts, { expr = true, desc = "Change definition (rename)" }))
 				keymap("n", "g.", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code action" }))
 				keymap("v", "g.", vim.lsp.buf.code_action, vim.tbl_extend("force", opts, { desc = "Code action" }))
 				keymap("n", "<leader>dl", function()
@@ -228,7 +223,7 @@ return {
 							compositeLiteralFields = true,
 							constantValues = true,
 							functionTypeParameters = true,
-							parameterNames = true,
+							parameterNames = false,
 							rangeVariableTypes = true,
 						},
 					},
@@ -251,9 +246,9 @@ return {
 				settings = {
 					typescript = {
 						inlayHints = {
-							includeInlayParameterNameHints = "all",
+							includeInlayParameterNameHints = "none",
 							includeInlayParameterNameHintsWhenArgumentMatchesName = false,
-							includeInlayFunctionParameterTypeHints = true,
+							includeInlayFunctionParameterTypeHints = false,
 							includeInlayVariableTypeHints = true,
 							includeInlayPropertyDeclarationTypeHints = true,
 							includeInlayFunctionLikeReturnTypeHints = true,
@@ -262,9 +257,9 @@ return {
 					},
 					javascript = {
 						inlayHints = {
-							includeInlayParameterNameHints = "all",
+							includeInlayParameterNameHints = "none",
 							includeInlayParameterNameHintsWhenArgumentMatchesName = false,
-							includeInlayFunctionParameterTypeHints = true,
+							includeInlayFunctionParameterTypeHints = false,
 							includeInlayVariableTypeHints = true,
 							includeInlayPropertyDeclarationTypeHints = true,
 							includeInlayFunctionLikeReturnTypeHints = true,
@@ -538,9 +533,9 @@ return {
 			require("inc_rename").setup({
 				input_buffer_type = "dressing",
 			})
-			vim.keymap.set("n", "<leader>rn", function()
+			vim.keymap.set("n", "cd", function()
 				return ":IncRename " .. vim.fn.expand("<cword>")
-			end, { expr = true, desc = "Rename symbol (with preview)" })
+			end, { expr = true, desc = "Change definition (rename)" })
 		end,
 	},
 }

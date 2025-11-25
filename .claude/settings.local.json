@@ -8,7 +8,8 @@
       "WebFetch(domain:neovim.io)",
       "WebFetch(domain:neovim.discourse.group)",
       "Bash(git config:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

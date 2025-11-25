@@ -60,6 +60,9 @@ opt.backup = false
 opt.writebackup = false
 opt.swapfile = false
 
+-- Auto-reload files changed outside of Neovim
+opt.autoread = true
+
 -- Shell configuration to load zsh with .zshrc
 opt.shell = "/bin/zsh"
 opt.shellcmdflag = "-i -c"

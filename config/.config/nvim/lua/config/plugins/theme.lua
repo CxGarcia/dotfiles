@@ -55,6 +55,12 @@ return {
 
                 -- Additional UI elements
                 ColorColumn = { bg = bg },
+
+                -- Diagnostic underlines (make them more visible)
+                DiagnosticUnderlineError = { sp = "#eb6f92", undercurl = true },
+                DiagnosticUnderlineWarn = { sp = "#f6c177", undercurl = true },
+                DiagnosticUnderlineInfo = { sp = "#9ccfd8", undercurl = true },
+                DiagnosticUnderlineHint = { sp = "#c4a7e7", undercurl = true },
             }
         })
         vim.cmd("colorscheme rose-pine")

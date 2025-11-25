@@ -104,6 +104,33 @@ return {
 		end,
 	},
 
+	-- cmp-cmdline: Command and search mode completions
+	{
+		"hrsh7th/cmp-cmdline",
+		event = "CmdlineEnter",
+		dependencies = { "hrsh7th/nvim-cmp" },
+		config = function()
+			local cmp = require("cmp")
+
+			-- Command mode completions (:)
+			cmp.setup.cmdline(":", {
+				mapping = cmp.mapping.preset.cmdline(),
+				sources = cmp.config.sources({
+					{ name = "path" },
+					{ name = "cmdline" }
+				})
+			})
+
+			-- Search mode completions (/ and ?)
+			cmp.setup.cmdline({ "/", "?" }, {
+				mapping = cmp.mapping.preset.cmdline(),
+				sources = {
+					{ name = "buffer" }
+				}
+			})
+		end,
+	},
+
 	-- LuaSnip (snippet engine)
 	{
 		"L3MON4D3/LuaSnip",
