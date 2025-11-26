@@ -1,9 +1,13 @@
 -- Terminal management with toggleterm
 return {
-    "akinsho/toggleterm.nvim",
-    version = "*",
-    event = "VeryLazy",
-    config = function()
+    {
+        "akinsho/toggleterm.nvim",
+        version = "*",
+        event = "VeryLazy",
+        dependencies = {
+            "ryanmsnyder/toggleterm-manager.nvim",
+        },
+        config = function()
         require("toggleterm").setup({
             -- Size of terminal
             size = function(term)
@@ -249,5 +253,135 @@ return {
         vim.keymap.set("n", "<leader>t2", "<cmd>2ToggleTerm<CR>", vim.tbl_extend("force", opts, { desc = "Toggle terminal 2" }))
         vim.keymap.set("n", "<leader>t3", "<cmd>3ToggleTerm<CR>", vim.tbl_extend("force", opts, { desc = "Toggle terminal 3" }))
         vim.keymap.set("n", "<leader>t4", "<cmd>4ToggleTerm<CR>", vim.tbl_extend("force", opts, { desc = "Toggle terminal 4" }))
+
+        -- ============================================================
+        -- Named Purpose Terminals (tests, server, git)
+        -- ============================================================
+
+        -- Tests terminal (dedicated for running tests)
+        local tests_term = Terminal:new({
+            cmd = vim.o.shell,
+            hidden = true,
+            direction = "horizontal",
+            count = 10, -- Use high count to avoid conflicts
+            display_name = "Tests",
+            on_open = function(term)
+                vim.cmd("startinsert!")
+            end,
+        })
+
+        function _G.toggle_tests()
+            tests_term:toggle()
+        end
+
+        -- Server terminal (for dev servers)
+        local server_term = Terminal:new({
+            cmd = vim.o.shell,
+            hidden = true,
+            direction = "horizontal",
+            count = 11,
+            display_name = "Server",
+            on_open = function(term)
+                vim.cmd("startinsert!")
+            end,
+        })
+
+        function _G.toggle_server()
+            server_term:toggle()
+        end
+
+        -- Git terminal (for git operations)
+        local git_term = Terminal:new({
+            cmd = vim.o.shell,
+            hidden = true,
+            direction = "float",
+            count = 12,
+            display_name = "Git",
+            on_open = function(term)
+                vim.cmd("startinsert!")
+            end,
+        })
+
+        function _G.toggle_git()
+            git_term:toggle()
+        end
+
+        -- Named terminal keybindings
+        vim.keymap.set("n", "<leader>tT", "<cmd>lua toggle_tests()<CR>", vim.tbl_extend("force", opts, { desc = "Toggle Tests terminal" }))
+        vim.keymap.set("n", "<leader>ts", "<cmd>lua toggle_server()<CR>", vim.tbl_extend("force", opts, { desc = "Toggle Server terminal" }))
+        vim.keymap.set("n", "<leader>tg", "<cmd>lua toggle_git()<CR>", vim.tbl_extend("force", opts, { desc = "Toggle Git terminal" }))
+
+        -- ============================================================
+        -- Split Layout Functions (side-by-side terminals)
+        -- ============================================================
+
+        -- Open 2 terminals side by side
+        local function layout_double()
+            local width = math.floor(vim.o.columns * 0.4)
+            vim.cmd("2ToggleTerm direction=vertical size=" .. width)
+            vim.defer_fn(function()
+                vim.cmd("3ToggleTerm direction=vertical size=" .. width)
+            end, 100)
+        end
+
+        -- Open 3-pane layout: editor + 2 terminals
+        local function layout_triple()
+            vim.cmd("2ToggleTerm direction=vertical size=60")
+            vim.defer_fn(function()
+                vim.cmd("3ToggleTerm direction=vertical size=60")
+            end, 100)
+        end
+
+        -- Layout keybindings
+        vim.keymap.set("n", "<leader>tL", layout_double, vim.tbl_extend("force", opts, { desc = "Layout: 2 terminals side-by-side" }))
+        vim.keymap.set("n", "<leader>t#", layout_triple, vim.tbl_extend("force", opts, { desc = "Layout: 3-pane (editor + 2 terms)" }))
+
+        -- ============================================================
+        -- Terminal Navigation (cycling)
+        -- ============================================================
+
+        -- Track current terminal index for cycling
+        local current_term_idx = 1
+        local max_terms = 4
+
+        local function next_terminal()
+            current_term_idx = current_term_idx % max_terms + 1
+            vim.cmd(current_term_idx .. "ToggleTerm")
+        end
+
+        local function prev_terminal()
+            current_term_idx = (current_term_idx - 2) % max_terms + 1
+            vim.cmd(current_term_idx .. "ToggleTerm")
+        end
+
+        vim.keymap.set("n", "<leader>t]", next_terminal, vim.tbl_extend("force", opts, { desc = "Next terminal" }))
+        vim.keymap.set("n", "<leader>t[", prev_terminal, vim.tbl_extend("force", opts, { desc = "Previous terminal" }))
+
+        -- ============================================================
+        -- Toggleterm Manager Setup (Telescope integration)
+        -- ============================================================
+
+        require("toggleterm-manager").setup({
+            titles = {
+                prompt = "Terminals",
+                results = "Results",
+            },
+            mappings = {
+                i = {
+                    ["<CR>"] = { action = require("toggleterm-manager").actions.toggle_term, exit_on_action = true },
+                    ["<C-d>"] = { action = require("toggleterm-manager").actions.delete_term, exit_on_action = false },
+                    ["<C-r>"] = { action = require("toggleterm-manager").actions.rename_term, exit_on_action = false },
+                },
+                n = {
+                    ["<CR>"] = { action = require("toggleterm-manager").actions.toggle_term, exit_on_action = true },
+                    ["d"] = { action = require("toggleterm-manager").actions.delete_term, exit_on_action = false },
+                    ["r"] = { action = require("toggleterm-manager").actions.rename_term, exit_on_action = false },
+                },
+            },
+        })
+
+        -- Terminal picker keybinding
+        vim.keymap.set("n", "<leader>tf", "<cmd>Telescope toggleterm_manager<CR>", vim.tbl_extend("force", opts, { desc = "Terminal picker (Telescope)" }))
     end,
+    },
 }
