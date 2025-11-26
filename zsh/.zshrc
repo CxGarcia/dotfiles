@@ -1,8 +1,3 @@
-
-#### FIG ENV VARIABLES ####
-# Please make sure this block is at the start of this file.
-[ -s ~/.fig/shell/pre.sh ] && source ~/.fig/shell/pre.sh
-#### END FIG ENV VARIABLES ####
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -152,9 +147,15 @@ export CXBIN=$HOME/dotfiles/mac/mac-scripts
 export PYTHONBIN=/opt/homebrew/opt/python@3.13/libexec/bin
 export PATH="$PATH:$CXBIN:$GOBIN:$NODEBIN:$MYSQLBIN:$BREWBIN:$PYTHONBIN:$LOCALBIN:/usr/local/sbin"
 
-# Load Starship prompt (after PATH is set)
+# Load Starship prompt (cached for faster startup)
 if [[ -o interactive ]] && command -v starship &> /dev/null; then
-    eval "$(starship init zsh)"
+    starship_cache="${HOME}/.cache/starship_init.zsh"
+    starship_config="${HOME}/.config/starship.toml"
+    if [[ ! -f "$starship_cache" ]] || [[ -f "$starship_config" && "$starship_config" -nt "$starship_cache" ]]; then
+        mkdir -p "${HOME}/.cache"
+        starship init zsh > "$starship_cache"
+    fi
+    source "$starship_cache"
 fi
 
 #######ALIASES#######
@@ -227,8 +228,6 @@ export PATH="$HOME/.asdf/shims:$PATH"
 export EDITOR=nvim
 export VISUAL=nvim
 export GOTOOLCHAIN=auto
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"
 

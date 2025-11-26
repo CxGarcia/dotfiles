@@ -1,67 +1,43 @@
--- Flash.nvim - Enhanced motion plugin (successor to leap.nvim)
+-- Flash.nvim - Enhanced f/F/t/T motions and / search
 return {
     "folke/flash.nvim",
     event = "VeryLazy",
     opts = {
-        -- Disable labels (just like leap.nvim)
         labels = "asdfghjklqwertyuiopzxcvbnm",
         search = {
-            -- Search mode: exact, search, fuzzy
             mode = "exact",
-            -- Incremental search
-            incremental = false,
+            incremental = true,
         },
         jump = {
-            -- Jump on first match
             jumplist = true,
-            -- Jump position
             pos = "start",
-            -- Automatically jump when there is only one match
-            autojump = false,
+            autojump = true, -- Auto-jump when only one match
         },
         label = {
-            -- Show labels before or after the match
-            before = true,
             after = true,
-            -- Highlight current label
+            before = false,
             current = true,
-            -- Style: overlay, inline, eol
             style = "overlay",
         },
         modes = {
-            -- Options for search mode
+            -- Enhanced / search with flash labels
             search = {
                 enabled = true,
             },
+            -- Enhanced f/F/t/T with jump labels
             char = {
                 enabled = true,
-                -- Show jump labels after typing a character
                 jump_labels = true,
-                -- Label multiple matches
                 multi_line = true,
+                keys = { "f", "F", "t", "T" }, -- Explicitly only these keys
             },
         },
-        -- Treesitter integration
         highlight = {
             backdrop = true,
         },
     },
     keys = {
-        -- Remote Flash (for operating on distant text)
-        {
-            "r",
-            mode = "o",
-            function() require("flash").remote() end,
-            desc = "Remote Flash"
-        },
-        -- Treesitter search (visual mode search with treesitter)
-        {
-            "R",
-            mode = { "o", "x" },
-            function() require("flash").treesitter_search() end,
-            desc = "Treesitter Search"
-        },
-        -- Toggle flash in search (Ctrl-s while typing / search)
+        -- Toggle flash labels in / search
         {
             "<c-s>",
             mode = { "c" },
