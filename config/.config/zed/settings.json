@@ -1,108 +1,95 @@
-// Zed settings
-//
-// For information on how to configure Zed, see the Zed
-// documentation: https://zed.dev/docs/configuring-zed
-//
-// To see all of Zed's default settings without changing your
-// custom settings, run `zed: open default settings` from the
-// command palette
 {
-  /* Duplicated key auto-commented: "agent": {
-    "always_allow_tool_actions": true,
-    "model_parameters": []
-  }, */
-  "features": {
-    "edit_prediction_provider": "zed"
-  },
-  "editor": {
-    "show_word_completions": true
-  },
-  "edit_predictions": {
-    "show_inline_completions": true,
-    "disabled_globs": [".env"]
-  },
-  "agent": {
-    "always_allow_tool_actions": true,
-    "default_model": {
-      "provider": "anthropic",
-      "model": "claude-3-5-sonnet-latest"
+    "features": {
+        "edit_prediction_provider": "zed"
     },
-    "enable_experimental_live_diffs": true
-  },
-  "gutter": {
-    "folds": false,
-    "code_actions": false
-  },
-  "vim_mode": true,
-  "relative_line_numbers": true,
-  "ui_font_size": 16,
-  "buffer_font_size": 14,
-  "ui_font_family": "FiraMono Nerd Font",
-  "buffer_font_features": {
-    "calt": false
-  },
-  "command_aliases": {
-    "W": "w",
-    "Wq": "wq",
-    "Q": "q"
-  },
-  "scrollbar": {
-    "show": "never"
-  },
-  "vim": {
-    "use_multiline_find": true
-  },
-  "theme": {
-    "mode": "system",
-    "light": "One Light",
-    "dark": "cx-dark"
-  },
-
-  "languages": {
-    "YAML": {
-      "format_on_save": "off"
+    "edit_predictions": {
+        "disabled_globs": [".env"]
     },
-    "JavaScript": {
-      "formatter": { "language_server": { "name": "biome" } },
-      "code_actions_on_format": {
-        "source.fixAll.biome": true,
-        "source.organizeImports.biome": true
-      }
+    "gutter": {
+        "folds": false,
+        "runnables": true
     },
-    "TypeScript": {
-      "format_on_save": "on",
-      "formatter": { "language_server": { "name": "biome" } },
-      "code_actions_on_format": {
-        "source.fixAll.biome": true,
-        "source.organizeImports.biome": true
-      }
+    "vim_mode": true,
+    "relative_line_numbers": "enabled",
+    "ui_font_size": 16,
+    "buffer_font_size": 14,
+    "ui_font_family": "FiraMono Nerd Font",
+    "buffer_font_features": {
+        "calt": false
     },
-    "TSX": {
-      "format_on_save": "on",
-      "formatter": { "language_server": { "name": "biome" } },
-      "code_actions_on_format": {
-        "source.fixAll.biome": true,
-        "source.organizeImports.biome": true
-      }
+    "command_aliases": {
+        "W": "w",
+        "Wq": "wq",
+        "Q": "q"
     },
-    "Markdown": {
-      "soft_wrap": "editor_width"
+    "scrollbar": {
+        "show": "never"
+    },
+    "vim": {
+        "use_system_clipboard": "always",
+        "use_smartcase_find": true,
+        "highlight_on_yank_duration": 200,
+        "toggle_relative_line_numbers": true
+    },
+    "theme": {
+        "dark": "cx-dark",
+        "mode": "system",
+        "light": "One Light"
+    },
+    "tab_size": 4,
+    "hard_tabs": false,
+    "use_smartcase_search": true,
+    "current_line_highlight": "line",
+    "vertical_scroll_margin": 8,
+    "soft_wrap": "none",
+    "auto_indent": true,
+    "linked_edits": true,
+    "inlay_hints": {
+        "enabled": true
+    },
+    "languages": {
+        "YAML": {
+            "format_on_save": "off"
+        },
+        "JavaScript": {
+            "format_on_save": "on",
+            "formatter": [],
+            "code_actions_on_format": {
+                "source.fixAll.eslint": true
+            }
+        },
+        "TypeScript": {
+            "format_on_save": "on",
+            "formatter": [],
+            "code_actions_on_format": {
+                "source.fixAll.eslint": true
+            }
+        },
+        "TSX": {
+            "format_on_save": "on",
+            "formatter": [],
+            "code_actions_on_format": {
+                "source.fixAll.eslint": true
+            }
+        },
+        "Markdown": {
+            "soft_wrap": "editor_width"
+        }
+    },
+    "lsp": {
+        "biome": {
+            "settings": {
+                "require_config_file": true
+            }
+        }
+    },
+    "terminal": {
+        "font_family": "Fira Code",
+        "working_directory": "first_project_directory",
+        "font_size": 14
+    },
+    "project_panel": {
+        "dock": "right",
+        "indent_size": 14
     }
-  },
-  "lsp": {
-    "biome": {
-      "settings": {
-        "require_config_file": true
-      }
-    }
-  },
-  "terminal": {
-    "font_family": "Fira Code",
-    "working_directory": "first_project_directory",
-    "font_size": 14
-  },
-  "project_panel": {
-    "dock": "right",
-    "indent_size": 14
-  }
 }
