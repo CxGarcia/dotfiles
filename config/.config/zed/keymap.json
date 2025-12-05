@@ -1,60 +1,106 @@
-// Zed keymap
-//
-// For information on binding keys, see the Zed
-// documentation: https://zed.dev/docs/key-bindings
-//
-// To see the default key bindings run `zed: open default keymap`
-// from the command palette.
 [
-  {
-    "context": "Editor && VimControl && !VimWaiting && !menu && !assistant",
-    "bindings": {
-      "shift-k": "editor::Hover",
-      "space d": "diagnostics::Deploy",
-      "space p": "file_finder::Toggle",
-      "space o": "outline::Toggle",
-      "space t": "workspace::NewCenterTerminal",
-      "space e": "workspace::ToggleRightDock",
-      "space a": "agent::NewThread"
-    }
-  },
-  {
-    "context": "Workspace",
-    "bindings": {
-      "cmd-k": [
-        "projects::OpenRecent",
-        {
-          "create_new_window": false
+    {
+        "context": "Editor && VimControl && !VimWaiting && !menu && !assistant",
+        "bindings": {
+            "shift-k": "editor::Hover",
+            "space d": "diagnostics::Deploy",
+            "space p": "file_finder::Toggle",
+            "space o": "outline::Toggle",
+            "space t": "workspace::NewCenterTerminal",
+            "space e": "workspace::ToggleRightDock",
+            "space a": "agent::NewThread",
+            "space w": "workspace::Save",
+            "space f m": "editor::Format",
+            "space q": "pane::CloseActiveItem",
+            "space f g": "workspace::NewSearch",
+            "space f b": "tab_switcher::Toggle",
+            "space f s": "outline::Toggle",
+            "space f S": "project_symbols::Toggle",
+            "space f r": "file_finder::Toggle",
+            "space b d": "pane::CloseActiveItem",
+            "space g g": "workspace::ToggleLeftDock",
+            "space g p": "editor::ExpandExcerpts",
+            "g /": "workspace::NewSearch",
+            "g a": "editor::FindAllReferences",
+            "] c": "editor::GoToHunk",
+            "[ c": "editor::GoToPreviousHunk",
+            "shift-h": "pane::ActivatePreviousItem",
+            "shift-l": "pane::ActivateNextItem"
         }
-      ]
+    },
+    {
+        "context": "Workspace",
+        "bindings": {
+            "cmd-k": [
+                "projects::OpenRecent",
+                {
+                    "create_new_window": false
+                }
+            ]
+        }
+    },
+    {
+        "context": "ProjectPanel && not_editing",
+        "bindings": {
+            "space e": "workspace::ToggleRightDock",
+            "ctrl-w j": "workspace::ActivatePaneDown",
+            "ctrl-w k": "workspace::ActivatePaneUp",
+            "ctrl-w h": "workspace::ActivatePaneLeft",
+            "ctrl-w l": "workspace::ActivatePaneRight",
+            "a": "project_panel::NewFile",
+            "shift-a": "project_panel::NewDirectory",
+            "r": "project_panel::Rename",
+            "d": "project_panel::Trash",
+            "shift-d": "project_panel::Delete",
+            "x": "project_panel::Cut",
+            "c": "project_panel::Copy",
+            "p": "project_panel::Paste",
+            "y": "project_panel::CopyRelativePath",
+            "shift-y": "project_panel::CopyPath",
+            "/": "project_panel::NewSearchInDirectory",
+            "o": "project_panel::Open",
+            "enter": "project_panel::Open",
+            "v": "project_panel::OpenPermanent",
+            "s": "project_panel::RevealInFileManager",
+            "shift-o": "project_panel::OpenWithSystem",
+            "h": "project_panel::CollapseSelectedEntry",
+            "l": "project_panel::ExpandSelectedEntry",
+            "shift-h": "project_panel::CollapseAllEntries",
+            "g g": "menu::SelectFirst",
+            "shift-g": "menu::SelectLast"
+        }
+    },
+    {
+        "context": "vim_operator == a || vim_operator == i || vim_operator == cs",
+        "bindings": {
+            "b": "vim::AnyBrackets"
+        }
+    },
+    {
+        "context": "vim_mode == visual",
+        "bindings": {
+            "shift-s": ["vim::PushAddSurrounds", {}],
+            "shift-j": "editor::MoveLineDown",
+            "shift-k": "editor::MoveLineUp"
+        }
+    },
+    {
+        "context": "vim_mode == normal",
+        "bindings": {
+            "s": "vim::PushSneak",
+            "shift-s": "vim::PushSneakBackward"
+        }
+    },
+    {
+        "context": "Editor && edit_prediction_conflict",
+        "bindings": {
+            "tab": "editor::AcceptEditPrediction"
+        }
+    },
+    {
+        "context": "(VimControl && !menu)",
+        "bindings": {
+            "space g b": "editor::BlameHover"
+        }
     }
-  },
-  {
-    "context": "ProjectPanel",
-    "bindings": {
-      "space e": "workspace::ToggleRightDock",
-      "ctrl-w j": "workspace::ActivatePaneDown",
-      "ctrl-w k": "workspace::ActivatePaneUp",
-      "ctrl-w h": "workspace::ActivatePaneLeft",
-      "ctrl-w l": "workspace::ActivatePaneRight"
-    }
-  },
-  {
-    "context": "vim_operator == a || vim_operator == i || vim_operator == cs",
-    "bindings": {
-      "b": "vim::AnyBrackets"
-    }
-  },
-  {
-    "context": "vim_mode == visual",
-    "bindings": {
-      "shift-s": ["vim::PushAddSurrounds", {}]
-    }
-  },
-  {
-    "context": "Editor && edit_prediction_conflict",
-    "bindings": {
-      "tab": "editor::AcceptEditPrediction"
-    }
-  }
 ]

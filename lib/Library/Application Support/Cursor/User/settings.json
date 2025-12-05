@@ -95,6 +95,10 @@
       {
         "before": ["[", "c"],
         "commands": ["workbench.action.editor.previousChange"]
+      },
+      {
+        "before": ["<leader>", "w"],
+        "commands": ["workbench.action.files.save"]
       }
     ],
     "workbench.activityBar.orientation": "vertical",
