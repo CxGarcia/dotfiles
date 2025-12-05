@@ -1,0 +1,6 @@
+os:
+  # Open files in current Neovim session and close lazygit
+  open: 'nvr --remote {{filename}} -c "lua _G.close_lazygit()"'
+
+  # Also configure edit commands for consistency
+  editPreset: 'nvim-remote'

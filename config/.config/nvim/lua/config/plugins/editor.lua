@@ -175,7 +175,20 @@ return {
         },
         keys = {
             { "<leader>gg", "<cmd>LazyGit<cr>", desc = "LazyGit" }
-        }
+        },
+        config = function()
+            -- Global function to close lazygit buffer (called from lazygit via nvr)
+            _G.close_lazygit = function()
+                vim.schedule(function()
+                    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                        if vim.b[buf] and vim.b[buf].lazygit_buffer then
+                            vim.api.nvim_buf_delete(buf, { force = true })
+                            return
+                        end
+                    end
+                end)
+            end
+        end
     },
 
     -- Better code folding
