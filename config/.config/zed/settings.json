@@ -1,4 +1,12 @@
 {
+    "icon_theme": "Catppuccin Frappé",
+    "ssh_connections": [
+        {
+            "host": "github.com",
+            "args": [],
+            "projects": []
+        }
+    ],
     "features": {
         "edit_prediction_provider": "zed"
     },
