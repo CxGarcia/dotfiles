@@ -1,5 +1,54 @@
 [
   {
+    "label": "tmux: Project Session",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" \\; set-option status off",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 1",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:1\" 2>/dev/null || tmux new-window -t \"$session:1\"; tmux attach -t \"$session:1\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 2",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:2\" 2>/dev/null || tmux new-window -t \"$session:2\"; tmux attach -t \"$session:2\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 3",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:3\" 2>/dev/null || tmux new-window -t \"$session:3\"; tmux attach -t \"$session:3\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 4",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:4\" 2>/dev/null || tmux new-window -t \"$session:4\"; tmux attach -t \"$session:4\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Claude Code",
+    "command": "source ~/.zsh/tmux.zsh && tai",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Session Switcher",
+    "command": "sesh connect \"$(sesh list | fzf --height=50% --border=rounded --border-label=' Sessions ' --prompt='❯ ' --pointer='▶' --color=bg+:#252c33,bg:#252c33,spinner:#9ccfd8,hl:#ebbcba --color=fg:#e0def4,header:#eb6f92,info:#c4a7e7,pointer:#9ccfd8 --color=marker:#eb6f92,fg+:#e0def4,prompt:#c4a7e7,hl+:#ebbcba --color=border:#6e6a86)\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
     "label": "tv: Find Files",
     "command": "result=$(tv files) && [ -n \"$result\" ] && zed \"$result\"",
     "hide": "always",

@@ -7,7 +7,13 @@
             "space p": ["task::Spawn", { "task_name": "tv: Find Files" }],
             "space shift-p": ["task::Spawn", { "task_name": "tv: Git Repos" }],
             "space o": "outline::Toggle",
-            "space t": "workspace::NewCenterTerminal",
+            "space t t": ["task::Spawn", { "task_name": "tmux: Project Session" }],
+            "space t 1": ["task::Spawn", { "task_name": "tmux: Terminal 1" }],
+            "space t 2": ["task::Spawn", { "task_name": "tmux: Terminal 2" }],
+            "space t 3": ["task::Spawn", { "task_name": "tmux: Terminal 3" }],
+            "space t 4": ["task::Spawn", { "task_name": "tmux: Terminal 4" }],
+            "space t s": ["task::Spawn", { "task_name": "tmux: Session Switcher" }],
+            "space c c": ["task::Spawn", { "task_name": "tmux: Claude Code" }],
             "space e": "workspace::ToggleRightDock",
             "space a": "agent::NewThread",
             "space w": "workspace::Save",
@@ -39,6 +45,16 @@
                     "create_new_window": false
                 }
             ]
+        }
+    },
+    {
+        "context": "Terminal",
+        "bindings": {
+            "ctrl-w h": "workspace::ActivatePaneLeft",
+            "ctrl-w j": "workspace::ActivatePaneDown",
+            "ctrl-w k": "workspace::ActivatePaneUp",
+            "ctrl-w l": "workspace::ActivatePaneRight",
+            "ctrl-w w": ["workspace::ActivatePane", 0]
         }
     },
     {
