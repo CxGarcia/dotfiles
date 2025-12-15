@@ -6,5 +6,5 @@ function cdd --description "Quick cd to ~/dev or subdirectory"
     end
 end
 
-# Tab completions - list directories in ~/dev
-complete -c cdd -f -a "(command ls -1 $DEV 2>/dev/null)"
+# Tab completions - list directories in ~/dev with descriptions
+complete -c cdd -f -a "(for dir in $DEV/*/; set -l name (basename \$dir); echo \$name\t'dev project'; end)"

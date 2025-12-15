@@ -57,6 +57,9 @@ end
 # Completions
 # =============================================================================
 
+# Tab opens completions and lets you type to filter (keeps list open)
+bind \t complete-and-search
+
 # bun completions
 if test -f $HOME/.bun/_bun.fish
     source $HOME/.bun/_bun.fish
