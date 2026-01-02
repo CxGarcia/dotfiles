@@ -13,5 +13,5 @@ function cdn --description "Quick cd to nest project directories"
 end
 
 # Tab completions - list apps + special dirs
-complete -c cdn -f -a "commonlib web"
-complete -c cdn -f -a "(command ls -1 $DEV/nest/apps 2>/dev/null)"
+complete -c cdn -f -a "commonlib\t'packages/commonlib'" -a "web\t'websites/web'"
+complete -c cdn -f -a "(for dir in $DEV/nest/apps/*/; set -l name (basename \$dir); echo \$name\t'nest app'; end)"

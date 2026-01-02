@@ -60,6 +60,10 @@ end
 # Tab opens completions and lets you type to filter (keeps list open)
 bind \t complete-and-search
 
+# Up/down arrows search history by prefix (type 'cl' then up to find 'claude')
+bind \e\[A history-search-backward
+bind \e\[B history-search-forward
+
 # bun completions
 if test -f $HOME/.bun/_bun.fish
     source $HOME/.bun/_bun.fish
@@ -103,6 +107,11 @@ alias destroynode "seekndestroy node_modules; seekndestroy dist; seekndestroy bu
 alias wpcloud "ssh cx@46.101.204.150"
 alias cxcloud "ssh cx@159.89.111.58"
 alias hotcloud "ssh cx@207.154.201.191"
+
+# Listing
+alias lsa "ls -lah"
+alias ll "ls -lh"
+alias la "ls -ah"
 
 # Misc
 alias retropush "rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"

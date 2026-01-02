@@ -4,18 +4,18 @@
         {
             "host": "github.com",
             "args": [],
-            "projects": []
-        }
+            "projects": [],
+        },
     ],
     "features": {
-        "edit_prediction_provider": "zed"
+        "edit_prediction_provider": "zed",
     },
     "edit_predictions": {
-        "disabled_globs": [".env"]
+        "disabled_globs": [".env"],
     },
     "gutter": {
         "folds": false,
-        "runnables": true
+        "runnables": true,
     },
     "vim_mode": true,
     "relative_line_numbers": "enabled",
@@ -23,26 +23,26 @@
     "buffer_font_size": 14,
     "ui_font_family": "FiraMono Nerd Font",
     "buffer_font_features": {
-        "calt": false
+        "calt": false,
     },
     "command_aliases": {
         "W": "w",
         "Wq": "wq",
-        "Q": "q"
+        "Q": "q",
     },
     "scrollbar": {
-        "show": "never"
+        "show": "never",
     },
     "vim": {
         "use_system_clipboard": "always",
         "use_smartcase_find": true,
         "highlight_on_yank_duration": 200,
-        "toggle_relative_line_numbers": true
+        "toggle_relative_line_numbers": true,
     },
     "theme": {
         "dark": "cx-dark",
         "mode": "system",
-        "light": "One Light"
+        "light": "One Light",
     },
     "tab_size": 4,
     "hard_tabs": false,
@@ -52,53 +52,49 @@
     "soft_wrap": "none",
     "auto_indent": true,
     "linked_edits": true,
-    "inlay_hints": {
-        "enabled": true,
-        "show_type_hints": false
-    },
     "languages": {
         "YAML": {
-            "format_on_save": "off"
+            "format_on_save": "off",
         },
         "JavaScript": {
             "format_on_save": "on",
             "formatter": [],
             "code_actions_on_format": {
-                "source.fixAll.eslint": true
-            }
+                "source.fixAll.eslint": true,
+            },
         },
         "TypeScript": {
             "format_on_save": "on",
             "formatter": [],
             "code_actions_on_format": {
-                "source.fixAll.eslint": true
-            }
+                "source.fixAll.eslint": true,
+            },
         },
         "TSX": {
             "format_on_save": "on",
             "formatter": [],
             "code_actions_on_format": {
-                "source.fixAll.eslint": true
-            }
+                "source.fixAll.eslint": true,
+            },
         },
         "Markdown": {
-            "soft_wrap": "editor_width"
-        }
+            "soft_wrap": "editor_width",
+        },
     },
     "lsp": {
         "biome": {
             "settings": {
-                "require_config_file": true
-            }
-        }
+                "require_config_file": true,
+            },
+        },
     },
     "terminal": {
         "font_family": "Fira Code",
         "working_directory": "first_project_directory",
-        "font_size": 14
+        "font_size": 14,
     },
     "project_panel": {
         "dock": "right",
-        "indent_size": 14
-    }
+        "indent_size": 14,
+    },
 }
