@@ -113,5 +113,11 @@ alias lsa "ls -lah"
 alias ll "ls -lh"
 alias la "ls -ah"
 
+# Navigation
+alias .. "cd .."
+alias ... "cd ../.."
+alias .... "cd ../../.."
+alias ..... "cd ../../../.."
+
 # Misc
 alias retropush "rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
