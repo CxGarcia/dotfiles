@@ -121,3 +121,10 @@ alias ..... "cd ../../../.."
 
 # Misc
 alias retropush "rsync -arv ~/Documents/retropie/* pi@192.168.0.31:~/RetroPie/roms/"
+
+# Abbreviations
+abbr -a pbc pbcopy
+abbr -a pbp pbpaste
+abbr -a ef "$EDITOR ~/.config/fish/config.fish"
+abbr -a sf "source ~/.config/fish/config.fish"
+abbr -a cl clear
