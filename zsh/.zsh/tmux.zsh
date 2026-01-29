@@ -1,7 +1,7 @@
 # ==========================================
-# Tmux + Sesh Configuration
+# Tmux Configuration
 # ==========================================
-# Smart tmux session management with telescope-style UI
+# Smart tmux session management
 
 # t: Smart tmux attach - attach to last session or create new
 function t() {
@@ -100,45 +100,6 @@ function tfam() {
         tmux switch-client -t "$session_name"
     fi
 }
-
-# ts: Simple telescope-style session switcher with sesh
-function ts() {
-    if ! command -v sesh &> /dev/null; then
-        echo "sesh not found. Install with: brew install joshmedeski/sesh/sesh"
-        return 1
-    fi
-
-    # If inside tmux, use tmux popup for better integration
-    if [ -n "$TMUX" ]; then
-        tmux display-popup -E -w 60% -h 60% -b none "sesh connect \"\$(sesh list | fzf --border=rounded --border-label=' Sessions ' --prompt='❯ ' --pointer='▶' --color=bg+:#252c33,bg:#252c33,spinner:#9ccfd8,hl:#ebbcba --color=fg:#e0def4,header:#eb6f92,info:#c4a7e7,pointer:#9ccfd8 --color=marker:#eb6f92,fg+:#e0def4,prompt:#c4a7e7,hl+:#ebbcba --color=border:#6e6a86 --no-preview --bind='ctrl-d:execute(tmux kill-session -t {})+reload(sesh list)')\""
-        return
-    fi
-
-    # Outside tmux, use regular fzf
-    local session=$(
-        sesh list | \
-        fzf \
-            --height=50% \
-            --border=rounded \
-            --border-label=' Sessions ' \
-            --prompt='❯ ' \
-            --pointer='▶' \
-            --color=bg+:#252c33,bg:#252c33,spinner:#9ccfd8,hl:#ebbcba \
-            --color=fg:#e0def4,header:#eb6f92,info:#c4a7e7,pointer:#9ccfd8 \
-            --color=marker:#eb6f92,fg+:#e0def4,prompt:#c4a7e7,hl+:#ebbcba \
-            --color=border:#6e6a86 \
-            --margin=5%,20%,5%,20% \
-            --no-preview \
-            --bind='ctrl-d:execute(tmux kill-session -t {})+reload(sesh list)'
-    )
-
-    [[ -z "$session" ]] && return
-    sesh connect "$session"
-}
-
-# Keybindings: Option-s to open tmux session switcher
-# Note: Requires terminal to send Esc+ for Option key (iTerm2: Preferences > Profiles > Keys > Left Option = Esc+)
-bindkey -s '\es' 'ts\n'
 
 # tkill: Kill all active tmux sessions
 function tkill() {

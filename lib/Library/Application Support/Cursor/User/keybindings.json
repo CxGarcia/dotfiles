@@ -2,16 +2,23 @@
 [
     {
         "key": "enter",
-        "commands": [
-            "search.action.viewAsTree",
-            "search.action.focusSearchList",
-        ],
+        "command": "search.action.focusSearchList",
+        "when": "searchInputBoxFocus"
+    },
+    {
+        "key": "g /",
+        "command": "workbench.action.findInFiles",
+        "when": "listFocus && searchViewletFocus"
+    },
+    {
+        "key": "escape",
+        "command": "workbench.action.focusActiveEditorGroup",
         "when": "searchViewletFocus"
     },
     {
         "key": "escape",
-        "command": "search.action.focusSearchFromResults",
-        "when": "searchViewletFocus"
+        "command": "workbench.action.focusActiveEditorGroup",
+        "when": "inSearchEditor"
     },
     {
         "key": "cmd+enter",

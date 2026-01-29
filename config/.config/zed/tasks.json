@@ -40,40 +40,5 @@
     "hide": "on_success",
     "allow_concurrent_runs": false,
     "use_new_terminal": true
-  },
-  {
-    "label": "tmux: Session Switcher",
-    "command": "sesh connect \"$(sesh list | fzf --height=50% --border=rounded --border-label=' Sessions ' --prompt='❯ ' --pointer='▶' --color=bg+:#252c33,bg:#252c33,spinner:#9ccfd8,hl:#ebbcba --color=fg:#e0def4,header:#eb6f92,info:#c4a7e7,pointer:#9ccfd8 --color=marker:#eb6f92,fg+:#e0def4,prompt:#c4a7e7,hl+:#ebbcba --color=border:#6e6a86)\"",
-    "hide": "on_success",
-    "allow_concurrent_runs": false,
-    "use_new_terminal": true
-  },
-  {
-    "label": "tv: Find Files",
-    "command": "result=$(tv files) && [ -n \"$result\" ] && zed \"$result\"",
-    "hide": "always",
-    "allow_concurrent_runs": true,
-    "use_new_terminal": true
-  },
-  {
-    "label": "tv: Live Grep",
-    "command": "result=$(tv text) && [ -n \"$result\" ] && file=$(echo \"$result\" | cut -d: -f1) && line=$(echo \"$result\" | cut -d: -f2) && zed \"$file:$line\"",
-    "hide": "always",
-    "allow_concurrent_runs": true,
-    "use_new_terminal": true
-  },
-  {
-    "label": "tv: Git Changed Files",
-    "command": "result=$(tv git-diff) && [ -n \"$result\" ] && zed \"$result\"",
-    "hide": "always",
-    "allow_concurrent_runs": true,
-    "use_new_terminal": true
-  },
-  {
-    "label": "tv: Git Repos",
-    "command": "result=$(tv git-repos) && [ -n \"$result\" ] && zed \"$result\"",
-    "hide": "always",
-    "allow_concurrent_runs": true,
-    "use_new_terminal": true
   }
 ]

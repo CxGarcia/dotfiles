@@ -1,0 +1,41 @@
+# =============================================================================
+# Starship - Rose Pine
+# =============================================================================
+
+[character]
+success_symbol = "[❯](#9ccfd8)"
+error_symbol = "[❯](#eb6f92)"
+
+[directory]
+style = "#9ccfd8"
+
+[git_branch]
+style = "#ebbcba"
+
+[git_status]
+style = "bold #f6c177"
+
+[cmd_duration]
+style = "#6e6a86"
+
+# Language modules - iris version
+[bun]
+format = "via [$symbol($version)]($style) "
+style = "#c4a7e7"
+
+[nodejs]
+format = "via [$symbol($version)]($style) "
+style = "#c4a7e7"
+
+[python]
+format = "via [$symbol($version)]($style) "
+style = "#c4a7e7"
+
+[golang]
+format = "via [$symbol($version)]($style) "
+style = "#c4a7e7"
+
+[rust]
+format = "via [$symbol($version)]($style) "
+style = "#c4a7e7"
+

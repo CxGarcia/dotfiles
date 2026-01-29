@@ -1,0 +1,5 @@
+complete -c tmux -n "__fish_seen_subcommand_from attach-session a attach" -f -a "(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
+complete -c tmux -n "__fish_seen_subcommand_from switch-client switch" -f -a "(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
+complete -c tmux -n "__fish_seen_subcommand_from kill-session" -f -a "(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
+complete -c tmux -n "__fish_seen_subcommand_from has-session has" -f -a "(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
+complete -c tmux -n "__fish_seen_subcommand_from new-session new" -s t -d "Group with session" -a "(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
