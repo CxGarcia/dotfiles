@@ -1,0 +1,44 @@
+[
+  {
+    "label": "tmux: Project Session",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" \\; set-option status off",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 1",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:1\" 2>/dev/null || tmux new-window -t \"$session:1\"; tmux attach -t \"$session:1\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 2",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:2\" 2>/dev/null || tmux new-window -t \"$session:2\"; tmux attach -t \"$session:2\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 3",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:3\" 2>/dev/null || tmux new-window -t \"$session:3\"; tmux attach -t \"$session:3\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Terminal 4",
+    "command": "session=$(basename \"$PWD\" | tr . _); tmux new-session -A -s \"$session\" -d \\; set-option status off 2>/dev/null; tmux select-window -t \"$session:4\" 2>/dev/null || tmux new-window -t \"$session:4\"; tmux attach -t \"$session:4\"",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  },
+  {
+    "label": "tmux: Claude Code",
+    "command": "source ~/.zsh/tmux.zsh && tai",
+    "hide": "on_success",
+    "allow_concurrent_runs": false,
+    "use_new_terminal": true
+  }
+]

@@ -45,18 +45,30 @@
         "commands": ["editor.action.goToTypeDefinition"]
       },
       {
+        "before": ["g", "D"],
+        "commands": ["editor.action.goToDeclaration"]
+      },
+      {
+        "before": ["g", "h"],
+        "commands": ["editor.action.showHover"]
+      },
+      {
+        "before": ["g", "a"],
+        "commands": ["editor.action.goToReferences"]
+      },
+      {
         "before": ["<leader>", "o"],
         "commands": ["workbench.action.gotoSymbol"],
-        "args": ["-1"],
+        "args": ["-1"]
       },
       {
         "before": ["<leader>", "O"],
-        "commands": ["workbench.action.showAllSymbols"],
+        "commands": ["workbench.action.showAllSymbols"]
       },
       {
         "before": ["g", "A"],
         "commands": ["editor.action.goToReferences"],
-        "args": ["-1"],
+        "args": ["-1"]
       },
       {
         "before": ["g", "s"],
@@ -68,21 +80,20 @@
       },
       {
         "before": ["g", "/"],
-        "commands": [
-          "editor.action.addSelectionToNextFindMatch",
-          {
-            "command": "workbench.action.findInFiles",
-            "args": {
-              "query": "${selectedText}",
-              "triggerSearch": true
-            }
-          }
-        ],
+        "commands": ["workbench.action.findInFiles"]
       },
       {
         "before": ["<leader>", "d"],
         "commands": ["workbench.actions.view.problems"],
         "silent": true
+      },
+      {
+        "before": ["<leader>", "p"],
+        "commands": ["workbench.action.quickOpen"]
+      },
+      {
+        "before": ["<leader>", "k"],
+        "commands": ["workbench.action.showCommands"]
       },
       {
         "before": ["c", "d"],
@@ -99,6 +110,42 @@
       {
         "before": ["<leader>", "w"],
         "commands": ["workbench.action.files.save"]
+      },
+      {
+        "before": ["<leader>", "f", "m"],
+        "commands": ["editor.action.formatDocument"]
+      },
+      {
+        "before": ["H"],
+        "commands": ["workbench.action.previousEditor"]
+      },
+      {
+        "before": ["L"],
+        "commands": ["workbench.action.nextEditor"]
+      },
+      {
+        "before": ["<leader>", "f", "c"],
+        "commands": ["workbench.view.scm"]
+      },
+      {
+        "before": ["<leader>", "f", "r"],
+        "commands": ["workbench.action.openRecent"]
+      },
+      {
+        "before": ["<leader>", "f", "b"],
+        "commands": ["workbench.action.showAllEditors"]
+      },
+      {
+        "before": ["<leader>", "f", "g"],
+        "commands": ["workbench.action.findInFiles"]
+      },
+      {
+        "before": ["]", "s"],
+        "commands": ["search.action.focusNextSearchResult"]
+      },
+      {
+        "before": ["[", "s"],
+        "commands": ["search.action.focusPreviousSearchResult"]
       }
     ],
     "workbench.activityBar.orientation": "vertical",
