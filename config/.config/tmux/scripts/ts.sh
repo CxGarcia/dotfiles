@@ -36,8 +36,8 @@ if [[ "${1:-}" == "--windows" ]]; then
         tmux list-windows -a -F '#{session_name}:#{window_index} #{window_name}' |
         fzf --prompt="  Windows > " \
             --preview='tmux capture-pane -ep -t "$(echo {} | cut -d" " -f1)" 2>/dev/null' \
-            --preview-window=right:55% \
-            --color="$COLORS" --no-border --no-sort --no-separator --layout=reverse --padding=1,3
+            --preview-window=right:55%:border-left \
+            --color="$COLORS" --no-border --no-sort --no-separator --header=" " --layout=reverse --padding=0,3
     ) || exit 0
     tmux switch-client -t "$(echo "$selected" | cut -d' ' -f1)"
     exit 0
@@ -50,7 +50,7 @@ PREVIEW_DIR='ls -1 --color=always {} 2>/dev/null || ls -1G {} 2>/dev/null'
 
 selected=$(
     list_sessions |
-    fzf --prompt="" \
+    fzf --prompt="> " \
         --print-query \
         --pointer="" \
         --delimiter='\t' \
@@ -58,8 +58,8 @@ selected=$(
         --bind="ctrl-f:reload($SELF --list-dirs)+change-preview($PREVIEW_DIR)" \
         --bind="ctrl-s:reload($SELF --list)+change-preview($PREVIEW_SESSION)" \
         --preview="$PREVIEW_SESSION" \
-        --preview-window=right:55% \
-        --color="$COLORS" --no-border --no-sort --no-separator --layout=reverse --info=right --padding=1,3
+        --preview-window=right:55%:border-left \
+        --color="$COLORS" --no-border --no-sort --no-separator --header=" " --info=inline-right --padding=0,3
 ) || exit 0
 
 query=$(echo "$selected" | sed -n '1p')
