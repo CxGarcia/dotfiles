@@ -38,7 +38,6 @@ else
     tmux new-window -d -t "$SESSION:2" -n "util" -c "$REPO_ROOT"
     tmux set-option -w -t "$SESSION:2" @repo_root "$REPO_ROOT"
     tmux split-window -d -v -t "$SESSION:2" -c "$REPO_ROOT"
-    tmux select-pane -t "$SESSION:2.1"
 fi
 
 # Silence activity monitoring on util window (prevents bell on switch)
