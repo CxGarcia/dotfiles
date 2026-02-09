@@ -33,14 +33,6 @@ fish_add_path -g $HOME/.asdf/shims
 fish_add_path -g /Applications/Tailscale.app/Contents/MacOS
 
 # =============================================================================
-# Auto-attach to tmux (every new terminal starts in tmux)
-# =============================================================================
-
-if status is-interactive; and not set -q TMUX; and command -q tmux
-    exec tmux new-session -c $HOME
-end
-
-# =============================================================================
 # Version Managers
 # =============================================================================
 
