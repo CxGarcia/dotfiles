@@ -42,3 +42,6 @@ fi
 
 # Silence activity monitoring on util window (prevents bell on switch)
 tmux set-option -w -t "$SESSION:2" monitor-activity off 2>/dev/null
+
+# Ensure the session's main window stays selected (not util)
+tmux select-window -t "$SESSION:1" 2>/dev/null

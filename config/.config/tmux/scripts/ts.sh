@@ -82,11 +82,15 @@ else
     work_dir=$(zoxide query "$name" 2>/dev/null || echo "$HOME")
 fi
 
-# Create Claude workspace session from resolved directory
-session_name="$(basename "$work_dir" | tr '.' '_')-workspace"
-if ! tmux has-session -t="$session_name" 2>/dev/null; then
-    tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
-    tmux send-keys -t "$session_name:claude" "claude --dangerously-skip-permissions" C-m
-    zoxide add "$work_dir" 2>/dev/null
-fi
+# Create Claude workspace session from resolved directory (always new)
+base_name="$(basename "$work_dir" | tr '.' '_')"
+session_name="$base_name"
+n=2
+while tmux has-session -t="$session_name" 2>/dev/null; do
+    session_name="${base_name}-${n}"
+    n=$((n + 1))
+done
+tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
+tmux send-keys -t "$session_name:=claude" "claude --dangerously-skip-permissions" C-m
+zoxide add "$work_dir" 2>/dev/null
 tmux switch-client -t "$session_name:=claude" 2>/dev/null || tmux switch-client -t="$session_name"
