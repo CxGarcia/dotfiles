@@ -63,9 +63,9 @@ opt.swapfile = false
 -- Auto-reload files changed outside of Neovim
 opt.autoread = true
 
--- Shell configuration to load zsh with .zshrc
-opt.shell = "/bin/zsh"
-opt.shellcmdflag = "-i -c"
+-- Shell configuration
+opt.shell = "/opt/homebrew/bin/fish"
+opt.shellcmdflag = "-c"
 
 -- Session options (what gets saved in sessions)
 opt.sessionoptions = {

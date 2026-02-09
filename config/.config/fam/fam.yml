@@ -15,7 +15,7 @@ daemon:
   health_check_interval: 30s
 tui:
   commands:
-    ide: zsh -i -c "code {dir}"
+    ide: fish -c "code {dir}"
     terminal: open -a iTerm {dir}
 agent:
   default_provider: claude

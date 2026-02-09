@@ -36,7 +36,7 @@
   },
   {
     "label": "tmux: Claude Code",
-    "command": "source ~/.zsh/tmux.zsh && tai",
+    "command": "fish -c tai",
     "hide": "on_success",
     "allow_concurrent_runs": false,
     "use_new_terminal": true

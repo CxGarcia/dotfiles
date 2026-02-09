@@ -5,6 +5,9 @@ function tclaude --description "Claude Code workspace with dev layout"
     set -l base_name (basename $PWD | tr . _)-workspace
     set -l dev_cmd $argv[1]
 
+    # Track this directory in zoxide so it appears in the session picker
+    zoxide add $PWD 2>/dev/null
+
     if set -q _flag_new
         set -l suffix 1
         while tmux has-session -t "$base_name-$suffix" 2>/dev/null
@@ -14,24 +17,25 @@ function tclaude --description "Claude Code workspace with dev layout"
     end
 
     if not tmux has-session -t $base_name 2>/dev/null
-        tmux new-session -d -s $base_name -c $PWD
+        # Create session with Claude window (full screen)
+        tmux new-session -d -s $base_name -n "claude" -c $PWD
+        tmux send-keys -t "$base_name:claude" "claude --dangerously-skip-permissions" C-m
 
-        # Split vertically: left 60%, right 40%
-        tmux split-window -h -t "$base_name:1" -p 40 -c $PWD
-
-        # Split right pane horizontally: top 50%, bottom 50%
-        tmux split-window -v -t "$base_name:1.2" -p 50 -c $PWD
-
-        # Start Claude Code in left pane
-        tmux send-keys -t "$base_name:1.1" "claude --dangerously-skip-permissions" C-m
-
-        # Start dev server in right top pane if command provided
+        # Create dev window only if dev command provided
         if test -n "$dev_cmd"
-            tmux send-keys -t "$base_name:1.2" "$dev_cmd" C-m
+            tmux new-window -t $base_name -n "dev" -c $PWD
+            tmux split-window -v -t "$base_name:dev" -p 50 -c $PWD
+            tmux send-keys -t "$base_name:dev.1" "$dev_cmd" C-m
+            # Focus back on Claude window
+            tmux select-window -t "$base_name:claude"
         end
-
-        # Focus Claude Code pane
-        tmux select-pane -t "$base_name:1.1"
+    else
+        # Session exists — check if Claude is running in it
+        # Handles restored sessions from resurrect where panes are empty
+        set -l pane_cmd (tmux list-panes -t "$base_name:claude" -F '#{pane_current_command}' 2>/dev/null | head -1)
+        if test "$pane_cmd" != claude
+            tmux send-keys -t "$base_name:claude" "claude --dangerously-skip-permissions" C-m
+        end
     end
 
     if test -z "$TMUX"
