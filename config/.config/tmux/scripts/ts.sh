@@ -37,7 +37,7 @@ if [[ "${1:-}" == "--windows" ]]; then
         fzf --prompt="  Windows > " \
             --preview='tmux capture-pane -ep -t "$(echo {} | cut -d" " -f1)" 2>/dev/null' \
             --preview-window=right:55% \
-            --color="$COLORS" --border=rounded --no-sort
+            --color="$COLORS" --no-border --no-sort
     ) || exit 0
     tmux switch-client -t "$(echo "$selected" | cut -d' ' -f1)"
     exit 0
@@ -58,7 +58,7 @@ selected=$(
         --bind="ctrl-s:reload($SELF --list)+change-prompt(  Sessions > )+change-preview($PREVIEW_SESSION)" \
         --preview="$PREVIEW_SESSION" \
         --preview-window=right:55% \
-        --color="$COLORS" --border=rounded --no-sort
+        --color="$COLORS" --no-border --no-sort
 ) || exit 0
 
 query=$(echo "$selected" | sed -n '1p')
@@ -74,15 +74,18 @@ if tmux has-session -t="$name" 2>/dev/null; then
     exit 0
 fi
 
-# Directory → create session named after basename
+# Resolve to a directory: use directly if path, otherwise zoxide lookup
 if [[ -d "$name" ]]; then
-    session_name=$(basename "$name" | tr '.' '-')
-    tmux has-session -t="$session_name" 2>/dev/null || tmux new-session -d -s "$session_name" -c "$name"
-    tmux switch-client -t="$session_name"
-    exit 0
+    work_dir="$name"
+else
+    work_dir=$(zoxide query "$name" 2>/dev/null || echo "$HOME")
 fi
 
-# Typed name → zoxide lookup for working dir, fallback to $HOME
-work_dir=$(zoxide query "$name" 2>/dev/null || echo "$HOME")
-tmux new-session -d -s "$name" -c "$work_dir"
-tmux switch-client -t="$name"
+# Create Claude workspace session from resolved directory
+session_name="$(basename "$work_dir" | tr '.' '_')-workspace"
+if ! tmux has-session -t="$session_name" 2>/dev/null; then
+    tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
+    tmux send-keys -t "$session_name:claude" "claude --dangerously-skip-permissions" C-m
+    zoxide add "$work_dir" 2>/dev/null
+fi
+tmux switch-client -t "$session_name:=claude" 2>/dev/null || tmux switch-client -t="$session_name"
