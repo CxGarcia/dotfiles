@@ -37,7 +37,7 @@ if [[ "${1:-}" == "--windows" ]]; then
         fzf --prompt="  Windows > " \
             --preview='tmux capture-pane -ep -t "$(echo {} | cut -d" " -f1)" 2>/dev/null' \
             --preview-window=right:55% \
-            --color="$COLORS" --no-border --no-sort
+            --color="$COLORS" --no-border --no-sort --padding=1,3
     ) || exit 0
     tmux switch-client -t "$(echo "$selected" | cut -d' ' -f1)"
     exit 0
@@ -58,7 +58,7 @@ selected=$(
         --bind="ctrl-s:reload($SELF --list)+change-prompt(  Sessions > )+change-preview($PREVIEW_SESSION)" \
         --preview="$PREVIEW_SESSION" \
         --preview-window=right:55% \
-        --color="$COLORS" --no-border --no-sort
+        --color="$COLORS" --no-border --no-sort --padding=1,3
 ) || exit 0
 
 query=$(echo "$selected" | sed -n '1p')
