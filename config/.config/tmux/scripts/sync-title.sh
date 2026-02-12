@@ -10,6 +10,10 @@ PANE_ID="$3"
 # Only care about the "claude" window
 [[ "$WINDOW_NAME" != "claude" ]] && exit 0
 
+# Only sync from the first pane (skip team agent split-panes)
+PANE_INDEX=$(tmux display-message -p -t "$PANE_ID" '#{pane_index}' 2>/dev/null)
+[[ "$PANE_INDEX" != "1" ]] && exit 0
+
 # Query pane title safely via tmux (avoids shell quoting issues)
 TITLE=$(tmux display-message -p -t "$PANE_ID" '#{pane_title}' 2>/dev/null)
 [[ -z "$TITLE" ]] && exit 0
