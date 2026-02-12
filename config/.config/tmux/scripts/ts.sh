@@ -21,7 +21,7 @@ list_sessions() {
 case "${1:-}" in
     --list)     list_sessions; exit 0 ;;
     --list-dirs)
-        { zoxide query -l 2>/dev/null; find "$HOME/dev" -maxdepth 1 -mindepth 1 -type d 2>/dev/null; } | awk '!seen[$0]++'
+        { zoxide query -l 2>/dev/null; find "$HOME/dev" -maxdepth 1 -mindepth 1 -type d 2>/dev/null; } | awk '!seen[$0]++ { printf "\t%s\n", $0 }'
         exit 0 ;;
     --kill)
         [[ -z "${2:-}" || "$2" == "${3:-}" ]] && exit 0
@@ -47,7 +47,7 @@ fi
 # ── Session picker ───────────────────────────────────────────────────
 
 PREVIEW_SESSION='tmux capture-pane -ep -t "$(echo {} | cut -f1):=claude" 2>/dev/null'
-PREVIEW_DIR='ls -1 --color=always {} 2>/dev/null || ls -1G {} 2>/dev/null'
+PREVIEW_DIR='ls -1 --color=always {2} 2>/dev/null || ls -1G {2} 2>/dev/null'
 
 selected=$(
     list_sessions |
