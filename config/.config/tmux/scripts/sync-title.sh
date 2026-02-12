@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # sync-title.sh — Rename tmux session to match Claude Code's pane title
 # Called by tmux pane-title-changed hook.
-# Args: $1=session_name  $2=window_name  $3=pane_title
+# Args: $1=session_name  $2=window_name  $3=pane_id
 
 SESSION="$1"
 WINDOW_NAME="$2"
-TITLE="$3"
+PANE_ID="$3"
 
 # Only care about the "claude" window
 [[ "$WINDOW_NAME" != "claude" ]] && exit 0
+
+# Query pane title safely via tmux (avoids shell quoting issues)
+TITLE=$(tmux display-message -p -t "$PANE_ID" '#{pane_title}' 2>/dev/null)
+[[ -z "$TITLE" ]] && exit 0
 
 # Strip leading emoji/symbols and whitespace (e.g. "✳ Fix auth bug" → "Fix auth bug")
 clean=${TITLE#*[[:space:]]}

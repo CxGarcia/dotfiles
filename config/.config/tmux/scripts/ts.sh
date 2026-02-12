@@ -2,6 +2,7 @@
 # ts.sh — tmux session/window switcher with fzf
 
 CURRENT_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null)
+CURRENT_SESSION_ID=$(tmux display-message -p '#{session_id}' 2>/dev/null)
 
 COLORS="bg+:#2d3843,fg:#908caa,fg+:#e0def4,hl:#ebbcba,hl+:#ebbcba"
 COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#ebbcba"
@@ -9,11 +10,11 @@ COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#e
 # ── Subcommands (called by fzf binds) ───────────────────────────────
 
 list_sessions() {
-    tmux list-sessions -F '#{session_activity} #{session_name}' |
-        sort -rn | awk '{print $NF}' | grep -vxF "$CURRENT_SESSION" |
-        while IFS= read -r sess; do
-            title=$(tmux display-message -t "$sess:=claude" -p '#{pane_title}' 2>/dev/null)
-            printf '%s\t%s\n' "$sess" "$title"
+    tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' |
+        sort -rn | while read -r _ id name; do
+            [[ "$name" == "$CURRENT_SESSION" ]] && continue
+            title=$(tmux display-message -t "$id:=claude" -p '#{pane_title}' 2>/dev/null)
+            printf '%s\t%s\t%s\n' "$id" "$name" "$title"
         done
 }
 
@@ -24,7 +25,7 @@ case "${1:-}" in
         exit 0 ;;
     --kill)
         [[ -z "${2:-}" || "$2" == "${3:-}" ]] && exit 0
-        tmux kill-session -t="$2" 2>/dev/null; exit 0 ;;
+        tmux kill-session -t "$2" 2>/dev/null; exit 0 ;;
 esac
 
 SELF="bash $0"
@@ -54,7 +55,8 @@ selected=$(
         --print-query \
         --pointer="" \
         --delimiter='\t' \
-        --bind="ctrl-d:execute-silent($SELF --kill {1} $CURRENT_SESSION)+reload($SELF --list)" \
+        --with-nth=2.. \
+        --bind="ctrl-d:execute-silent($SELF --kill {1} $CURRENT_SESSION_ID)+reload($SELF --list)" \
         --bind="ctrl-f:reload($SELF --list-dirs)+change-preview($PREVIEW_DIR)" \
         --bind="ctrl-s:reload($SELF --list)+change-preview($PREVIEW_SESSION)" \
         --preview="$PREVIEW_SESSION" \
@@ -64,14 +66,16 @@ selected=$(
 
 query=$(echo "$selected" | sed -n '1p')
 choice=$(echo "$selected" | sed -n '2p')
-name=$([[ -n "$choice" ]] && echo "$choice" | cut -f1 || echo "$query")
-[[ -z "$name" ]] && exit 0
+# Use stable session ID (field 1) when a session was selected, fall back to query for new sessions
+target=$([[ -n "$choice" ]] && echo "$choice" | cut -f1 || echo "")
+name=$([[ -n "$choice" ]] && echo "$choice" | cut -f2 || echo "$query")
+[[ -z "$target" && -z "$name" ]] && exit 0
 
 # ── Act on selection ─────────────────────────────────────────────────
 
-# Existing session → switch to its claude window
-if tmux has-session -t="$name" 2>/dev/null; then
-    tmux switch-client -t "$name:=claude" 2>/dev/null || tmux switch-client -t="$name"
+# Existing session → switch using stable session ID
+if [[ -n "$target" ]]; then
+    tmux switch-client -t "$target:=claude" 2>/dev/null || tmux switch-client -t "$target"
     exit 0
 fi
 
