@@ -64,6 +64,70 @@ for key, app in pairs(applicationHotkeys) do
     end)
 end
 
+local sessionPickerTap = (function()
+    local waitingForSecond = false
+    local timer = nil
+    local tap
+
+    local function reset()
+        waitingForSecond = false
+        if timer then timer:stop(); timer = nil end
+    end
+
+    local function replayCtrlA()
+        tap:stop()
+        hs.eventtap.keyStroke({'ctrl'}, 'a', 0)
+        tap:start()
+    end
+
+    tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
+        local flags = event:getFlags()
+        local keyCode = event:getKeyCode()
+        local isCtrlA = flags.ctrl and not flags.cmd and not flags.alt and not flags.shift and keyCode == 0
+
+        local iterm = hs.application.find('iTerm2')
+        if iterm and iterm:isFrontmost() then
+            reset()
+            return false
+        end
+
+        if isCtrlA then
+            if waitingForSecond then
+                reset()
+                if iterm then
+                    iterm:activate()
+                else
+                    hs.application.launchOrFocus('iTerm')
+                end
+                hs.timer.doAfter(0.15, function()
+                    hs.task.new("/opt/homebrew/bin/tmux", nil, {
+                        "display-popup", "-E", "-w", "80%", "-h", "70%",
+                        "-S", "fg=#3a4450",
+                        "bash ~/.config/tmux/scripts/ts.sh"
+                    }):start()
+                end)
+                return true
+            else
+                waitingForSecond = true
+                timer = hs.timer.doAfter(0.3, function()
+                    reset()
+                    replayCtrlA()
+                end)
+                return true
+            end
+        end
+
+        if waitingForSecond then
+            reset()
+            replayCtrlA()
+        end
+        return false
+    end)
+
+    return tap
+end)()
+sessionPickerTap:start()
+
 local editorConfigPath = "~/.editor-profile"
 
 local function readEditorConfig()
