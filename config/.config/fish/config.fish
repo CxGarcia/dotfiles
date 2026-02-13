@@ -58,6 +58,9 @@ end
 # Completions
 # =============================================================================
 
+# Ctrl+A Ctrl+A opens tmux session picker (mirrors tmux prefix + C-a)
+bind \ca\ca 'ts; commandline -f repaint'
+
 # Tab opens completions and lets you type to filter (keeps list open)
 bind \t complete-and-search
 

@@ -4,6 +4,14 @@
 CURRENT_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null)
 CURRENT_SESSION_ID=$(tmux display-message -p '#{session_id}' 2>/dev/null)
 
+go_to_session() {
+    if [[ -n "$TMUX" ]]; then
+        tmux switch-client -t "$1" 2>/dev/null || tmux switch-client -t "$2"
+    else
+        tmux attach-session -t "$1" 2>/dev/null || tmux attach-session -t "$2"
+    fi
+}
+
 COLORS="bg+:#2d3843,fg:#908caa,fg+:#e0def4,hl:#ebbcba,hl+:#ebbcba"
 COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#ebbcba"
 
@@ -12,7 +20,7 @@ COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#e
 list_sessions() {
     tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' |
         sort -rn | while read -r _ id name; do
-            [[ "$name" == "$CURRENT_SESSION" ]] && continue
+            [[ "$name" == "$CURRENT_SESSION" || "$name" == _picker_* ]] && continue
             title=$(tmux display-message -t "$id:=claude" -p '#{pane_title}' 2>/dev/null)
             printf '%s\t%s\t%s\n' "$id" "$name" "$title"
         done
@@ -40,7 +48,12 @@ if [[ "${1:-}" == "--windows" ]]; then
             --preview-window=right:55%:border-left \
             --color="$COLORS" --no-border --no-sort --no-separator --header=" " --layout=reverse --padding=0,3
     ) || exit 0
-    tmux switch-client -t "$(echo "$selected" | cut -d' ' -f1)"
+    target_win="$(echo "$selected" | cut -d' ' -f1)"
+    if [[ -n "$TMUX" ]]; then
+        tmux switch-client -t "$target_win"
+    else
+        tmux attach-session -t "$target_win"
+    fi
     exit 0
 fi
 
@@ -75,7 +88,7 @@ name=$([[ -n "$choice" ]] && echo "$choice" | cut -f2 || echo "$query")
 
 # Existing session → switch using stable session ID
 if [[ -n "$target" ]]; then
-    tmux switch-client -t "$target:=claude" 2>/dev/null || tmux switch-client -t "$target"
+    go_to_session "$target:=claude" "$target"
     exit 0
 fi
 
@@ -97,4 +110,4 @@ done
 tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
 tmux send-keys -t "$session_name:=claude" "claude --dangerously-skip-permissions" C-m
 zoxide add "$work_dir" 2>/dev/null
-tmux switch-client -t "$session_name:=claude" 2>/dev/null || tmux switch-client -t="$session_name"
+go_to_session "$session_name:=claude" "$session_name"
