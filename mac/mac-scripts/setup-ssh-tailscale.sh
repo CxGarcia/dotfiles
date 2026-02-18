@@ -6,7 +6,6 @@ set -euo pipefail
 # - Key-only auth (no passwords)
 # - Adds Moshi (iOS) public key
 
-MOSHI_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBava1lXoLZ0s46V8EhQCbpWRlwjwSOfjdOJKj0xl+MO moshi"
 SSHD_CONF="/etc/ssh/sshd_config.d/200-tailscale-hardening.conf"
 CURRENT_USER="$(whoami)"
 
@@ -66,11 +65,20 @@ chmod 700 ~/.ssh
 touch ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
 
+echo ""
+echo "Paste your Moshi public key (ssh-ed25519 ...):"
+read -r MOSHI_PUBKEY
+
+if [[ ! "$MOSHI_PUBKEY" =~ ^ssh-(ed25519|rsa|ecdsa) ]]; then
+  echo "Error: doesn't look like a valid public key"
+  exit 1
+fi
+
 if ! grep -qF "$MOSHI_PUBKEY" ~/.ssh/authorized_keys; then
   echo "$MOSHI_PUBKEY" >> ~/.ssh/authorized_keys
-  echo "Added Moshi public key to authorized_keys"
+  echo "Added public key to authorized_keys"
 else
-  echo "Moshi public key already present"
+  echo "Public key already present"
 fi
 
 # --- Enable Remote Login ---
