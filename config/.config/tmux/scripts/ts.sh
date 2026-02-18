@@ -4,12 +4,18 @@
 CURRENT_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null)
 CURRENT_SESSION_ID=$(tmux display-message -p '#{session_id}' 2>/dev/null)
 
+# Clean up stale _picker_ sessions (created by ts.fish for out-of-tmux invocations)
+tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^_picker_' | while read -r s; do
+    [[ "$s" != "$CURRENT_SESSION" ]] && tmux kill-session -t "$s" 2>/dev/null
+done
+
 go_to_session() {
     if [[ -n "$TMUX" ]]; then
         tmux switch-client -t "$1" 2>/dev/null || tmux switch-client -t "$2"
     else
         tmux attach-session -t "$1" 2>/dev/null || tmux attach-session -t "$2"
     fi
+    [[ "$CURRENT_SESSION" == _picker_* ]] && tmux kill-session -t "$CURRENT_SESSION" 2>/dev/null
 }
 
 COLORS="bg+:#2d3843,fg:#908caa,fg+:#e0def4,hl:#ebbcba,hl+:#ebbcba"
