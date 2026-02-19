@@ -29,7 +29,6 @@ fish_add_path -g /opt/homebrew/bin
 fish_add_path -g /opt/homebrew/opt/python@3.13/libexec/bin
 fish_add_path -g $HOME/.local/bin
 fish_add_path -g /usr/local/sbin
-fish_add_path -g $HOME/.asdf/shims
 fish_add_path -g /Applications/Tailscale.app/Contents/MacOS
 
 # =============================================================================
@@ -39,11 +38,6 @@ fish_add_path -g /Applications/Tailscale.app/Contents/MacOS
 # fnm (fast node manager)
 if command -q fnm
     fnm env --use-on-cd --shell fish | source
-end
-
-# asdf
-if test -f /opt/homebrew/opt/asdf/libexec/asdf.fish
-    source /opt/homebrew/opt/asdf/libexec/asdf.fish
 end
 
 # =============================================================================
