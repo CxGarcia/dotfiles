@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# sync-title.sh — Rename tmux session to match Claude Code's pane title
+# sync-title.sh — Rename tmux session once from Claude Code's pane title,
+# then store subsequent titles as session metadata (@claude_task).
 # Called by tmux pane-title-changed hook.
 # Args: $1=session_name  $2=window_name  $3=pane_id
 
@@ -22,6 +23,13 @@ TITLE=$(tmux display-message -p -t "$PANE_ID" '#{pane_title}' 2>/dev/null)
 clean=${TITLE#*[[:space:]]}
 [[ -z "$clean" ]] && exit 0
 
+# Always update the metadata with the latest task description
+tmux set-option -t "$SESSION" @claude_task "$clean" 2>/dev/null
+
+# Check if session has already been renamed (locked)
+locked=$(tmux show-option -qv -t "$SESSION" @title_locked 2>/dev/null)
+[[ "$locked" == "1" ]] && exit 0
+
 # Convert to tmux-safe session name: lowercase, spaces→hyphens, strip bad chars, truncate
 name=$(echo "$clean" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9_-' | cut -c1-30 | sed 's/-$//')
 [[ -z "$name" ]] && exit 0
@@ -37,4 +45,9 @@ while tmux has-session -t="$final" 2>/dev/null; do
     ((n++))
 done
 
-tmux rename-session -t "$SESSION" "$final" 2>/dev/null || exit 0
+if tmux rename-session -t "$SESSION" "$final" 2>/dev/null; then
+    # Lock the name so future title changes only update metadata
+    tmux set-option -t "$final" @title_locked 1 2>/dev/null
+    # Re-set metadata on the renamed session (session name changed)
+    tmux set-option -t "$final" @claude_task "$clean" 2>/dev/null
+fi

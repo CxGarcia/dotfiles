@@ -27,15 +27,18 @@ list_sessions() {
     tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' |
         sort -rn | while read -r _ id name; do
             [[ "$name" == "$CURRENT_SESSION" || "$name" == _picker_* ]] && continue
-            title=$(tmux display-message -t "$id:=claude" -p '#{pane_title}' 2>/dev/null)
-            printf '%s\t%s\t%s\n' "$id" "$name" "$title"
+            task=$(tmux display-message -t "$id:=claude" -p '#{pane_title}' 2>/dev/null)
+            task=${task#*[[:space:]]}
+            repo=$(basename "$(tmux display-message -t "$id:=claude" -p '#{pane_current_path}' 2>/dev/null)" 2>/dev/null)
+            [[ -z "$task" ]] && task="$name"
+            printf '%s\t%s\t%s\t%s\n' "$id" "$name" "$task" "$repo"
         done
 }
 
 case "${1:-}" in
     --list)     list_sessions; exit 0 ;;
     --list-dirs)
-        { zoxide query -l 2>/dev/null; find "$HOME/dev" -maxdepth 1 -mindepth 1 -type d 2>/dev/null; } | awk '!seen[$0]++ { printf "\t%s\n", $0 }'
+        { zoxide query -l 2>/dev/null; find "$HOME/dev" -maxdepth 1 -mindepth 1 -type d 2>/dev/null; } | awk -v home="$HOME" '!seen[$0]++ { display=$0; sub("^"home, "~", display); printf "\t%s\t%s\n", $0, display }'
         exit 0 ;;
     --kill)
         [[ -z "${2:-}" || "$2" == "${3:-}" ]] && exit 0
@@ -74,7 +77,8 @@ selected=$(
         --print-query \
         --pointer="" \
         --delimiter='\t' \
-        --with-nth=2.. \
+        --with-nth=3 \
+        --nth=.. \
         --bind="ctrl-x:execute-silent($SELF --kill {1} $CURRENT_SESSION_ID)+reload($SELF --list)" \
         --bind="ctrl-f:reload($SELF --list-dirs)+change-preview($PREVIEW_DIR)" \
         --bind="ctrl-s:reload($SELF --list)+change-preview($PREVIEW_SESSION)" \
