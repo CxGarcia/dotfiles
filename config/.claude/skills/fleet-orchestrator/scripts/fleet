@@ -1,0 +1,734 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FLEET_DIR="$HOME/.claude/fleet"
+REGISTRY="$FLEET_DIR/registry.json"
+EVENTS="$FLEET_DIR/events.jsonl"
+REPOS="$FLEET_DIR/repos.json"
+
+mkdir -p "$FLEET_DIR"
+[ -f "$REGISTRY" ] || echo '{"version":1,"updated":"","features":{}}' > "$REGISTRY"
+[ -f "$EVENTS" ] || touch "$EVENTS"
+[ -f "$REPOS" ] || echo '{}' > "$REPOS"
+
+ts() { date -u +%FT%TZ; }
+
+log_event() {
+  local feature="$1" event="$2"
+  shift 2
+  local extra=""
+  [ $# -gt 0 ] && extra=",$*"
+  echo "{\"ts\":\"$(ts)\",\"feature\":\"$feature\",\"event\":\"$event\"$extra}" >> "$EVENTS"
+}
+
+registry_read() { cat "$REGISTRY"; }
+
+registry_write() {
+  echo "$1" > "$REGISTRY.tmp"
+  mv "$REGISTRY.tmp" "$REGISTRY"
+}
+
+registry_update_feature() {
+  local name="$1" updates="$2"
+  registry_write "$(registry_read | jq --arg name "$name" --arg now "$(ts)" \
+    ".features[\$name] += $updates | .updated = \$now")"
+}
+
+registry_set_feature() {
+  local name="$1" feature_json="$2"
+  registry_write "$(registry_read | jq --arg name "$name" --argjson feat "$feature_json" --arg now "$(ts)" \
+    ".features[\$name] = \$feat | .updated = \$now")"
+}
+
+registry_get_feature() {
+  registry_read | jq -r --arg name "$1" '.features[$name] // empty'
+}
+
+require_feature() {
+  local name="$1"
+  local feat
+  feat=$(registry_get_feature "$name")
+  if [ -z "$feat" ]; then
+    echo "ERROR: Feature '$name' not found" >&2
+    exit 1
+  fi
+  echo "$feat"
+}
+
+repos_add() {
+  local full_path="$1"
+  local short_name
+  short_name=$(basename "$full_path")
+  jq --arg key "$short_name" --arg val "$full_path" '.[$key] = $val' "$REPOS" > "$REPOS.tmp"
+  mv "$REPOS.tmp" "$REPOS"
+}
+
+repos_resolve() {
+  local input="$1"
+
+  local expanded="${input/#\~/$HOME}"
+  if [ -d "$expanded" ]; then
+    echo "$expanded"
+    return 0
+  fi
+
+  local match
+  match=$(jq -r --arg key "$input" '.[$key] // empty' "$REPOS")
+  if [ -n "$match" ] && [ -d "$match" ]; then
+    echo "$match"
+    return 0
+  fi
+
+  match=$(jq -r --arg q "$input" 'to_entries[] | select(.key | contains($q)) | .value' "$REPOS" | head -1)
+  if [ -n "$match" ] && [ -d "$match" ]; then
+    echo "$match"
+    return 0
+  fi
+
+  return 1
+}
+
+cmd_desc() {
+  local name="$1"
+  shift
+  local desc="$*"
+  local feat
+  feat=$(require_feature "$name")
+  local session_name
+  session_name=$(echo "$feat" | jq -r '.tmuxSession')
+  tmux set-option -t "$session_name" @claude_task "$desc" 2>/dev/null
+  registry_update_feature "$name" "{\"description\":\"$desc\"}"
+  echo "DESC_UPDATED: $name -> $desc"
+}
+
+cmd_repos() {
+  case "${1:-list}" in
+    list)
+      echo "REPOS:"
+      jq -r 'to_entries[] | "  \(.key)\t\(.value)"' "$REPOS"
+      ;;
+    add)
+      local path="${2:-.}"
+      path=$(cd "$path" && pwd)
+      repos_add "$path"
+      echo "ADDED: $(basename "$path") -> $path"
+      ;;
+    rm)
+      local key="$2"
+      jq --arg key "$key" 'del(.[$key])' "$REPOS" > "$REPOS.tmp"
+      mv "$REPOS.tmp" "$REPOS"
+      echo "REMOVED: $key"
+      ;;
+  esac
+}
+
+session_exists() {
+  tmux has-session -t "$1" 2>/dev/null
+}
+
+tmux_send() {
+  local target="$1"
+  shift
+  tmux send-keys -t "$target:claude" -l "$*"
+  sleep 0.5
+  tmux send-keys -t "$target:claude" Enter
+}
+
+wait_for_ready() {
+  local target="$1"
+  local max_wait="${2:-120}"
+  local elapsed=0
+  while [ $elapsed -lt $max_wait ]; do
+    local cmd
+    cmd=$(tmux display-message -t "$target:claude" -p '#{pane_current_command}' 2>/dev/null || true)
+    if [ "$cmd" = "claude" ]; then
+      local content
+      content=$(tmux capture-pane -t "$target:claude" -p -S -5 2>/dev/null || true)
+      local has_prompt has_spinner
+      has_prompt=$(echo "$content" | grep -c '❯' 2>/dev/null || true)
+      has_spinner=$(echo "$content" | grep -cE '(ctrl.c to interrupt|tokens)' 2>/dev/null || true)
+      if [ "${has_prompt:-0}" -gt 0 ] && [ "${has_spinner:-0}" -eq 0 ]; then
+        sleep 2
+        return 0
+      fi
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  return 1
+}
+
+check_session_state() {
+  local target="$1"
+
+  if ! session_exists "$target"; then
+    echo "gone"
+    return
+  fi
+
+  local cmd
+  cmd=$(tmux display-message -t "$target" -p '#{pane_current_command}' 2>/dev/null || echo "")
+
+  if [ "$cmd" != "claude" ]; then
+    local dead
+    dead=$(tmux display-message -t "$target" -p '#{pane_dead}' 2>/dev/null || echo "0")
+    if [ "$dead" = "1" ]; then
+      local code
+      code=$(tmux display-message -t "$target" -p '#{pane_dead_status}' 2>/dev/null || echo "1")
+      if [ "$code" = "0" ]; then
+        echo "exited"
+      else
+        echo "crashed:$code"
+      fi
+    else
+      echo "exited"
+    fi
+    return
+  fi
+
+  local content
+  content=$(tmux capture-pane -t "$target" -p -S -10 2>/dev/null || echo "")
+
+  if echo "$content" | grep -qE '\[y/n\]|\[Y/n\]|\[yes/no\]'; then
+    echo "blocked"
+    return
+  fi
+
+  if echo "$content" | grep -qE '(ctrl\+c to interrupt|·.*tokens)'; then
+    echo "working"
+    return
+  fi
+
+  if echo "$content" | grep -q '❯'; then
+    echo "idle"
+    return
+  fi
+
+  echo "unknown"
+}
+
+cmd_spawn() {
+  local name="" repo="" description="" mode="phased"
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --mode) mode="$2"; shift 2 ;;
+      --description) description="$2"; shift 2 ;;
+      *) if [ -z "$name" ]; then name="$1"; elif [ -z "$repo" ]; then repo="$1"; elif [ -z "$description" ]; then description="$1"; fi; shift ;;
+    esac
+  done
+
+  if [ -z "$name" ] || [ -z "$repo" ]; then
+    echo "ERROR: Usage: fleet spawn <name> <repo> [description] [--mode phased|slfg]" >&2
+    exit 1
+  fi
+
+  local resolved
+  resolved=$(repos_resolve "$repo") || {
+    echo "ERROR: '$repo' is not a directory and not in repos index. Run 'fleet repos' to see known repos." >&2
+    exit 1
+  }
+  repo=$(cd "$resolved" && pwd)
+  if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "ERROR: $repo is not a git repository" >&2
+    exit 1
+  fi
+  repos_add "$repo"
+
+  local existing
+  existing=$(registry_get_feature "$name")
+  if [ -n "$existing" ]; then
+    local status
+    status=$(echo "$existing" | jq -r '.status')
+    if [ "$status" = "active" ] || [ "$status" = "blocked" ]; then
+      echo "ERROR: Feature '$name' already exists with status '$status'" >&2
+      exit 1
+    fi
+  fi
+
+  local session_name="$name"
+  local n=2
+  while session_exists "$session_name"; do
+    session_name="${name}-${n}"
+    n=$((n + 1))
+  done
+
+  tmux new-session -d -s "$session_name" -n claude -c "$repo"
+  tmux set-option -t "$session_name" @fleet_managed 1
+  [ -n "$description" ] && tmux set-option -t "$session_name" @claude_task "$description"
+
+  local session_id
+  session_id=$(tmux display-message -t "$session_name" -p '#{session_id}')
+
+  echo "SESSION_CREATED: $session_name (id: $session_id)"
+
+  tmux_send "$session_name" "claude -w $name --dangerously-skip-permissions"
+
+  echo "WAITING_FOR_CLAUDE..."
+  if ! wait_for_ready "$session_name" 90; then
+    echo "ERROR: Claude did not become ready within 90s" >&2
+    echo "SESSION: $session_name (you can attach manually)" >&2
+    exit 1
+  fi
+  echo "CLAUDE_READY"
+
+  local initial_cmd
+  case "$mode" in
+    slfg) initial_cmd="/slfg $description" ;;
+    fix) initial_cmd="$description" ;;
+    *) initial_cmd="/workflows:brainstorm $description" ;;
+  esac
+
+  tmux_send "$session_name" "$initial_cmd"
+  echo "COMMAND_SENT: $initial_cmd"
+
+  local phase
+  case "$mode" in
+    slfg) phase="slfg" ;;
+    fix) phase="fix" ;;
+    *) phase="brainstorm" ;;
+  esac
+
+  local feature_json
+  feature_json=$(jq -n \
+    --arg desc "$description" \
+    --arg repo "$repo" \
+    --arg wt "$repo/.claude/worktrees/$name" \
+    --arg branch "worktree-$name" \
+    --arg sess "$session_name" \
+    --arg sid "$session_id" \
+    --arg phase "$phase" \
+    --arg mode "$mode" \
+    --arg now "$(ts)" \
+    '{
+      description: $desc,
+      repo: $repo,
+      worktreePath: $wt,
+      branch: $branch,
+      tmuxSession: $sess,
+      tmuxSessionId: $sid,
+      phase: $phase,
+      phaseHistory: ["spawned"],
+      mode: $mode,
+      pr: null,
+      status: "active",
+      startedAt: $now,
+      updatedAt: $now,
+      artifacts: {}
+    }')
+
+  registry_set_feature "$name" "$feature_json"
+  log_event "$name" "spawned" "\"phase\":\"$phase\""
+  echo "REGISTERED: $name ($mode mode, phase: $phase)"
+}
+
+cmd_status() {
+  local features
+  features=$(registry_read | jq -r '.features | to_entries[] | select(.value.status != "done" and .value.status != "abandoned") | .key')
+
+  if [ -z "$features" ]; then
+    echo "NO_ACTIVE_FEATURES"
+    return
+  fi
+
+  echo "FEATURES:"
+  while IFS= read -r name; do
+    local feat
+    feat=$(registry_get_feature "$name")
+    local session_id phase status repo_path
+    session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+    phase=$(echo "$feat" | jq -r '.phase')
+    status=$(echo "$feat" | jq -r '.status')
+    repo_path=$(echo "$feat" | jq -r '.repo')
+    local repo_name
+    repo_name=$(basename "$repo_path")
+
+    local live_state
+    live_state=$(check_session_state "$session_id")
+
+    local pr_info=""
+    local pr_num
+    pr_num=$(echo "$feat" | jq -r '.pr.number // empty')
+    if [ -n "$pr_num" ]; then
+      local ci
+      ci=$(echo "$feat" | jq -r '.pr.ciStatus // "unknown"')
+      pr_info="PR #$pr_num ($ci)"
+    fi
+
+    local title=""
+    if [ "$live_state" != "gone" ]; then
+      title=$(tmux display-message -t "$session_id" -p '#{pane_title}' 2>/dev/null || echo "")
+      title=${title#*[[:space:]]}
+      [ "$title" = "Claude Code" ] && title=""
+    fi
+
+    echo "NAME=$name PHASE=$phase STATUS=$status LIVE=$live_state REPO=$repo_name PR=$pr_info TASK=$title"
+  done <<< "$features"
+}
+
+cmd_check() {
+  local name="$1"
+  local feat
+  feat=$(require_feature "$name")
+
+  local session_id
+  session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+  local state
+  state=$(check_session_state "$session_id")
+  local phase
+  phase=$(echo "$feat" | jq -r '.phase')
+
+  echo "FEATURE=$name PHASE=$phase STATE=$state"
+
+  if [ "$state" = "idle" ] || [ "$state" = "working" ] || [ "$state" = "blocked" ]; then
+    echo "PANE_OUTPUT:"
+    tmux capture-pane -t "$session_id" -p -S -5 2>/dev/null || true
+  fi
+}
+
+cmd_send() {
+  local name="$1"
+  shift
+  local command="$*"
+
+  local feat
+  feat=$(require_feature "$name")
+
+  local session_id
+  session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+  local state
+  state=$(check_session_state "$session_id")
+
+  if [ "$state" != "idle" ]; then
+    echo "ERROR: Session is not idle (state: $state). Cannot send command." >&2
+    exit 1
+  fi
+
+  local session_name
+  session_name=$(echo "$feat" | jq -r '.tmuxSession')
+  tmux_send "$session_name" "$command"
+  echo "SENT: $command"
+}
+
+cmd_advance() {
+  local name="$1"
+  local feat
+  feat=$(require_feature "$name")
+
+  local session_id phase mode
+  session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+  phase=$(echo "$feat" | jq -r '.phase')
+  mode=$(echo "$feat" | jq -r '.mode')
+
+  if [ "$mode" = "slfg" ]; then
+    echo "ERROR: Feature '$name' is in slfg mode — it advances autonomously" >&2
+    exit 1
+  fi
+
+  local state
+  state=$(check_session_state "$session_id")
+  if [ "$state" != "idle" ]; then
+    echo "ERROR: Session is not idle (state: $state). Wait for current phase to complete." >&2
+    exit 1
+  fi
+
+  local next_phase="" next_cmd=""
+  case "$phase" in
+    brainstorm) next_phase="plan"; next_cmd="/workflows:plan" ;;
+    plan) next_phase="work"; next_cmd="/workflows:work" ;;
+    work) next_phase="review"; next_cmd="/workflows:review latest" ;;
+    review) next_phase="simplify"; next_cmd="Run the code-simplifier agent on changes in this branch. Iterate until nothing left to simplify." ;;
+    simplify) next_phase="pr_monitoring"; next_cmd="" ;;
+    *) echo "ERROR: Cannot advance from phase '$phase'" >&2; exit 1 ;;
+  esac
+
+  if [ -n "$next_cmd" ]; then
+    local session_name
+    session_name=$(echo "$feat" | jq -r '.tmuxSession')
+    tmux_send "$session_name" "$next_cmd"
+    echo "SENT: $next_cmd"
+  fi
+
+  registry_write "$(registry_read | jq --arg name "$name" --arg next "$next_phase" --arg prev "$phase" --arg now "$(ts)" \
+    '.features[$name].phase = $next |
+     .features[$name].phaseHistory += [$prev] |
+     .features[$name].updatedAt = $now |
+     .updated = $now')"
+
+  log_event "$name" "phase_complete" "\"phase\":\"$phase\""
+  log_event "$name" "phase_start" "\"phase\":\"$next_phase\""
+  echo "ADVANCED: $name $phase -> $next_phase"
+}
+
+cmd_kill() {
+  local name="$1"
+  local feat
+  feat=$(require_feature "$name")
+
+  local session_id repo worktree_path branch session_name
+  session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+  repo=$(echo "$feat" | jq -r '.repo')
+  worktree_path=$(echo "$feat" | jq -r '.worktreePath')
+  branch=$(echo "$feat" | jq -r '.branch')
+  session_name=$(echo "$feat" | jq -r '.tmuxSession')
+
+  if session_exists "$session_id" 2>/dev/null || session_exists "$session_name" 2>/dev/null; then
+    local target="$session_id"
+    session_exists "$target" 2>/dev/null || target="$session_name"
+
+    tmux send-keys -t "$target" C-c 2>/dev/null || true
+    sleep 1
+    tmux send-keys -t "$target" -l "/exit" 2>/dev/null || true
+    tmux send-keys -t "$target" Enter 2>/dev/null || true
+    sleep 2
+    tmux kill-session -t "$target" 2>/dev/null || true
+    echo "SESSION_KILLED: $session_name"
+  else
+    echo "SESSION_ALREADY_GONE: $session_name"
+  fi
+
+  if [ -d "$worktree_path" ]; then
+    git -C "$repo" worktree remove --force "$worktree_path" 2>/dev/null || true
+    echo "WORKTREE_REMOVED: $worktree_path"
+  fi
+
+  if git -C "$repo" rev-parse --verify "$branch" >/dev/null 2>&1; then
+    git -C "$repo" branch -D "$branch" 2>/dev/null || true
+    echo "BRANCH_DELETED: $branch"
+  fi
+
+  for dir in "$HOME"/.claude/teams/work-* "$HOME"/.claude/tasks/work-*; do
+    [ -d "$dir" ] && rm -rf "$dir"
+  done
+
+  registry_update_feature "$name" "{\"status\":\"abandoned\",\"updatedAt\":\"$(ts)\"}"
+  log_event "$name" "abandoned"
+  echo "DONE: $name abandoned and cleaned up"
+}
+
+cmd_list() {
+  tmux list-sessions -F '#{session_id} #{session_name}' 2>/dev/null | while read -r id sname; do
+    local fleet
+    fleet=$(tmux show-option -qv -t "$sname" @fleet_managed 2>/dev/null || echo "")
+    if [ "$fleet" = "1" ]; then
+      local cmd
+      cmd=$(tmux display-message -t "$sname" -p '#{pane_current_command}' 2>/dev/null || echo "?")
+      echo "ID=$id NAME=$sname CMD=$cmd"
+    fi
+  done
+}
+
+cmd_recover() {
+  local features
+  features=$(registry_read | jq -r '.features | to_entries[] | select(.value.status == "active" or .value.status == "blocked") | .key')
+
+  if [ -z "$features" ]; then
+    echo "NO_FEATURES_TO_RECOVER"
+    return
+  fi
+
+  echo "RECOVERING:"
+  while IFS= read -r name; do
+    local feat
+    feat=$(registry_get_feature "$name")
+    local session_id repo branch worktree_path
+    session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+    repo=$(echo "$feat" | jq -r '.repo')
+    branch=$(echo "$feat" | jq -r '.branch')
+    worktree_path=$(echo "$feat" | jq -r '.worktreePath')
+
+    local session_alive="no" claude_running="no" worktree_exists="no" pr_status="none"
+
+    if session_exists "$session_id"; then
+      session_alive="yes"
+      local cmd
+      cmd=$(tmux display-message -t "$session_id" -p '#{pane_current_command}' 2>/dev/null || echo "")
+      [ "$cmd" = "claude" ] && claude_running="yes"
+    fi
+
+    [ -d "$worktree_path" ] && worktree_exists="yes"
+
+    local pr_json
+    pr_json=$(gh pr list --repo "$repo" --head "$branch" --json number,state --limit 1 2>/dev/null || echo "[]")
+    local pr_count
+    pr_count=$(echo "$pr_json" | jq 'length')
+    if [ "$pr_count" -gt 0 ]; then
+      pr_status=$(echo "$pr_json" | jq -r '.[0] | "PR #\(.number) (\(.state))"')
+    fi
+
+    if [ "$session_alive" = "no" ]; then
+      registry_update_feature "$name" '{"status":"crashed"}'
+    fi
+
+    local recover_status="ok"
+    [ "$session_alive" = "no" ] && recover_status="crashed"
+    echo "NAME=$name SESSION=$session_alive CLAUDE=$claude_running WORKTREE=$worktree_exists PR=$pr_status STATUS=$recover_status"
+  done <<< "$features"
+}
+
+cmd_monitor() {
+  local interval=30
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --interval) interval="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  local state_file="$FLEET_DIR/.monitor_state"
+  touch "$state_file"
+
+  echo "MONITOR_STARTED interval=${interval}s"
+
+  while true; do
+    local features
+    features=$(registry_read | jq -r '.features | to_entries[] | select(.value.status == "active" or .value.status == "blocked") | .key' 2>/dev/null || echo "")
+
+    if [ -z "$features" ]; then
+      sleep "$interval"
+      continue
+    fi
+
+    while IFS= read -r name; do
+      local feat
+      feat=$(registry_get_feature "$name")
+      local session_id phase status mode
+      session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+      phase=$(echo "$feat" | jq -r '.phase')
+      status=$(echo "$feat" | jq -r '.status')
+      mode=$(echo "$feat" | jq -r '.mode')
+
+      local live_state
+      live_state=$(check_session_state "$session_id")
+
+      local prev_state
+      prev_state=$(grep "^$name=" "$state_file" 2>/dev/null | cut -d= -f2 || echo "")
+
+      if [ "$live_state" = "$prev_state" ]; then
+        continue
+      fi
+
+      sed -i '' "/^$name=/d" "$state_file" 2>/dev/null || true
+      echo "$name=$live_state" >> "$state_file"
+
+      case "$live_state" in
+        idle)
+          if [ "$prev_state" = "working" ]; then
+            echo "ALERT PHASE_COMPLETE $name phase=$phase"
+            if [ "$mode" = "phased" ]; then
+              case "$phase" in
+                brainstorm|plan|review|simplify)
+                  echo "AUTO_ADVANCING $name from $phase"
+                  cmd_advance "$name" 2>/dev/null || echo "ADVANCE_FAILED $name"
+                  ;;
+                *)
+                  echo "ALERT NEEDS_ADVANCE $name phase=$phase (waiting for user)"
+                  ;;
+              esac
+            fi
+          fi
+          ;;
+        blocked)
+          echo "ALERT BLOCKED $name phase=$phase (needs user input)"
+          if [ "$status" != "blocked" ]; then
+            registry_update_feature "$name" '{"status":"blocked"}'
+          fi
+          ;;
+        crashed*)
+          echo "ALERT CRASHED $name phase=$phase state=$live_state"
+          registry_update_feature "$name" '{"status":"crashed"}'
+          log_event "$name" "crashed" "\"phase\":\"$phase\""
+          ;;
+        gone)
+          echo "ALERT SESSION_GONE $name phase=$phase"
+          registry_update_feature "$name" '{"status":"crashed"}'
+          log_event "$name" "crashed" "\"phase\":\"$phase\",\"detail\":\"session gone\""
+          ;;
+        working)
+          if [ "$status" = "blocked" ]; then
+            registry_update_feature "$name" '{"status":"active"}'
+            echo "ALERT UNBLOCKED $name (user answered, back to work)"
+          fi
+          ;;
+      esac
+    done <<< "$features"
+
+    local pr_features
+    pr_features=$(registry_read | jq -r '.features | to_entries[] | select(.value.phase == "pr_monitoring" and .value.pr != null) | .key' 2>/dev/null || echo "")
+    if [ -n "$pr_features" ]; then
+      while IFS= read -r name; do
+        local feat
+        feat=$(registry_get_feature "$name")
+        local pr_num repo
+        pr_num=$(echo "$feat" | jq -r '.pr.number')
+        repo=$(echo "$feat" | jq -r '.repo')
+
+        local pr_json
+        pr_json=$(gh pr view "$pr_num" --repo "$repo" --json state,statusCheckRollup 2>/dev/null || echo "{}")
+
+        local pr_state
+        pr_state=$(echo "$pr_json" | jq -r '.state // "UNKNOWN"')
+
+        if [ "$pr_state" = "MERGED" ]; then
+          echo "ALERT PR_MERGED $name PR #$pr_num"
+          registry_update_feature "$name" '{"status":"done","phase":"done"}'
+          log_event "$name" "done"
+        elif [ "$pr_state" = "CLOSED" ]; then
+          echo "ALERT PR_CLOSED $name PR #$pr_num"
+        fi
+
+        local ci_status="pending"
+        local has_failure all_success total
+        has_failure=$(echo "$pr_json" | jq '[.statusCheckRollup[]? | select(.conclusion == "FAILURE")] | length' 2>/dev/null || echo "0")
+        all_success=$(echo "$pr_json" | jq '[.statusCheckRollup[]? | select(.conclusion == "SUCCESS")] | length' 2>/dev/null || echo "0")
+        total=$(echo "$pr_json" | jq '[.statusCheckRollup[]?] | length' 2>/dev/null || echo "0")
+
+        local prev_ci
+        prev_ci=$(echo "$feat" | jq -r '.pr.ciStatus // "unknown"')
+
+        if [ "$has_failure" -gt 0 ]; then
+          ci_status="failing"
+          [ "$prev_ci" != "failing" ] && echo "ALERT CI_FAILED $name PR #$pr_num"
+        elif [ "$total" -gt 0 ] && [ "$all_success" = "$total" ]; then
+          ci_status="passing"
+          [ "$prev_ci" != "passing" ] && echo "ALERT CI_PASSED $name PR #$pr_num — ready to merge"
+        fi
+
+        registry_update_feature "$name" "{\"pr\":{\"number\":$pr_num,\"ciStatus\":\"$ci_status\",\"lastChecked\":\"$(ts)\"}}"
+      done <<< "$pr_features"
+    fi
+
+    sleep "$interval"
+  done
+}
+
+case "${1:-help}" in
+  spawn) shift; cmd_spawn "$@" ;;
+  status) cmd_status ;;
+  check) shift; cmd_check "$@" ;;
+  send) shift; cmd_send "$@" ;;
+  advance) shift; cmd_advance "$@" ;;
+  kill) shift; cmd_kill "$@" ;;
+  list) cmd_list ;;
+  recover) cmd_recover ;;
+  monitor) shift; cmd_monitor "$@" ;;
+  desc) shift; cmd_desc "$@" ;;
+  repos) shift; cmd_repos "$@" ;;
+  help|--help|-h)
+    echo "fleet — manage concurrent Claude Code feature sessions"
+    echo ""
+    echo "Commands:"
+    echo "  spawn <name> <repo> [description] [--mode phased|slfg]"
+    echo "  status                 dashboard of all active features"
+    echo "  check <name>           detailed state of one feature"
+    echo "  send <name> <command>  send command to idle session"
+    echo "  advance <name>         advance to next pipeline phase"
+    echo "  kill <name>            cleanup session, worktree, branch"
+    echo "  list                   list fleet-managed tmux sessions"
+    echo "  recover                reconcile registry with live state"
+    echo "  monitor [--interval N] long-running poller (run in background)"
+    echo "  desc <name> <text>     update feature description (and picker label)"
+    echo "  repos [list|add|rm]    manage repo shortname index"
+    ;;
+  *) echo "ERROR: Unknown command '$1'. Run 'fleet help' for usage." >&2; exit 1 ;;
+esac
