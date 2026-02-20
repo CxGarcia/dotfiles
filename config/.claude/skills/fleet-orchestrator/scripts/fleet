@@ -84,7 +84,7 @@ function resolveRepo(input: string): string | null {
 
 async function tmuxSend(session: string, text: string) {
   await $`tmux send-keys -t ${session}:claude -l ${text}`.quiet()
-  await Bun.sleep(500)
+  await Bun.sleep(1000)
   await $`tmux send-keys -t ${session}:claude Enter`.quiet()
 }
 
