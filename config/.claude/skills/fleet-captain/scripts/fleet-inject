@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# fleet-inject — Inject unread fleet events into orchestrator context
-# Configured as a UserPromptSubmit hook on the orchestrator session
-# Reads events.jsonl from last byte offset, outputs new events as context
+# fleet-inject — Inject unread fleet events into captain's context
+# Configured as a UserPromptSubmit hook
+# Reads events.jsonl from last byte offset, deduplicates, outputs summary
 
 EVENTS_FILE="$HOME/.claude/fleet/events.jsonl"
 OFFSET_FILE="$HOME/.claude/fleet/.events_offset"
@@ -12,47 +12,35 @@ CURRENT_SIZE=$(wc -c < "$EVENTS_FILE" | tr -d ' ')
 LAST_OFFSET=0
 [ -f "$OFFSET_FILE" ] && LAST_OFFSET=$(cat "$OFFSET_FILE")
 
-# Nothing new
 [ "$CURRENT_SIZE" -le "$LAST_OFFSET" ] && exit 0
 
-# Read new events from the offset
 NEW_EVENTS=$(tail -c +"$((LAST_OFFSET + 1))" "$EVENTS_FILE")
 [ -z "$NEW_EVENTS" ] && exit 0
 
-# Update offset
 echo "$CURRENT_SIZE" > "$OFFSET_FILE"
 
-# Format events for Claude context
-COUNT=$(echo "$NEW_EVENTS" | wc -l | tr -d ' ')
+# Deduplicate: keep only the latest event per feature+event_type
+DEDUPED=$(echo "$NEW_EVENTS" | jq -s '
+  group_by(.feature + ":" + .event)
+  | map(last)
+  | sort_by(.ts)
+' 2>/dev/null)
+
+[ -z "$DEDUPED" ] || [ "$DEDUPED" = "[]" ] && exit 0
+
+COUNT=$(echo "$DEDUPED" | jq 'length')
+[ "$COUNT" -eq 0 ] && exit 0
+
 echo ""
 echo "--- Fleet Events ($COUNT new) ---"
-echo "$NEW_EVENTS" | while IFS= read -r line; do
-  FEATURE=$(echo "$line" | jq -r '.feature // "?"')
-  EVENT=$(echo "$line" | jq -r '.event // "?"')
-  TS=$(echo "$line" | jq -r '.ts // ""')
-  case "$EVENT" in
-    pr_created)
-      URL=$(echo "$line" | jq -r '.url // ""')
-      echo "  $FEATURE: PR created $URL"
-      ;;
-    pushed)
-      BRANCH=$(echo "$line" | jq -r '.branch // ""')
-      echo "  $FEATURE: pushed $BRANCH"
-      ;;
-    idle)
-      echo "  $FEATURE: finished responding (idle)"
-      ;;
-    needs_input)
-      echo "  $FEATURE: needs user input"
-      ;;
-    context_warning)
-      echo "  $FEATURE: context window compacting (may lose coherence)"
-      ;;
-    *)
-      echo "  $FEATURE: $EVENT"
-      ;;
-  esac
-done
+echo "$DEDUPED" | jq -r '.[] |
+  if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
+  elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
+  elif .event == "idle" then "  \(.feature): idle (finished current work)"
+  elif .event == "needs_input" then "  \(.feature): NEEDS INPUT — user should jump in"
+  elif .event == "context_warning" then "  \(.feature): context compacting — may lose coherence"
+  else "  \(.feature): \(.event)"
+  end'
 echo "--- End Fleet Events ---"
 echo ""
 

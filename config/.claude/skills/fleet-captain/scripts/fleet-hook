@@ -14,8 +14,22 @@ echo "$CWD" | grep -q '\.claude/worktrees/' || exit 0
 FEATURE=$(echo "$CWD" | sed 's|.*\.claude/worktrees/||' | cut -d/ -f1)
 [ -z "$FEATURE" ] && exit 0
 
-EVENTS_FILE="$HOME/.claude/fleet/events.jsonl"
+FLEET_DIR="$HOME/.claude/fleet"
+EVENTS_FILE="$FLEET_DIR/events.jsonl"
+STATE_FILE="$FLEET_DIR/.hook_state"
 TS=$(date -u +%FT%TZ)
+
+# Dedup: only log if this is a state change for this feature
+last_event() {
+  grep "^$FEATURE=" "$STATE_FILE" 2>/dev/null | cut -d= -f2
+}
+
+set_state() {
+  local new_event="$1"
+  touch "$STATE_FILE"
+  sed -i '' "/^$FEATURE=/d" "$STATE_FILE" 2>/dev/null || true
+  echo "$FEATURE=$new_event" >> "$STATE_FILE"
+}
 
 log_event() {
   echo "$1" >> "$EVENTS_FILE"
@@ -23,7 +37,11 @@ log_event() {
 
 case "$EVENT" in
   Stop)
-    log_event "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"idle\"}"
+    # Only log idle transition, not every response
+    if [ "$(last_event)" != "idle" ]; then
+      set_state "idle"
+      log_event "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"idle\"}"
+    fi
     ;;
   PreCompact)
     log_event "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"context_warning\"}"
@@ -31,12 +49,18 @@ case "$EVENT" in
   Notification)
     TYPE=$(echo "$INPUT" | jq -r '.notification_type // empty')
     if [ "$TYPE" = "elicitation_dialog" ]; then
-      log_event "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"needs_input\"}"
+      if [ "$(last_event)" != "needs_input" ]; then
+        set_state "needs_input"
+        log_event "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"needs_input\"}"
+      fi
     fi
     ;;
   PostToolUse)
     TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
     [ "$TOOL" != "Bash" ] && exit 0
+
+    # Any tool use means the session is working (reset idle state)
+    set_state "working"
 
     COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
     RESPONSE=$(echo "$INPUT" | jq -r '.tool_response // empty')
