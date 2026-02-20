@@ -16,6 +16,8 @@ Manage concurrent feature sessions. Each feature runs autonomously in its own tm
 
 All operations go through `scripts/fleet`. Never run tmux commands directly.
 
+**NEVER** run `sleep`, polling loops, or background checks to watch sessions. Feature sessions push events to you automatically via hooks — you will see them as "Fleet Events" at the start of user messages. Respond to the user and stop. Do not block the session.
+
 ## CLI Reference
 
 ```bash
@@ -50,11 +52,11 @@ In **phased mode**, advance through the pipeline using `fleet advance <name>`:
 | simplify -> pr_monitoring | Auto-advance |
 | pr_monitoring -> done | User merges PR |
 
-Check readiness with `fleet check <name>`: STATE=idle means ready, STATE=working means in progress, STATE=blocked means needs user input.
+Use `fleet check <name>` only when the user asks about a specific feature.
 
-In **slfg mode**, the feature runs end-to-end autonomously. Only monitor for blocked states and PR creation.
+In **slfg mode**, the feature runs end-to-end autonomously. No action needed from you — events arrive via hooks.
 
-In **fix mode**, the description is sent as a plain prompt — no pipeline, no phases. Claude investigates, debugs, and fixes directly. The orchestrator just monitors for completion (idle) or blocks (needs input). No phase advancement needed.
+In **fix mode**, the description is sent as a plain prompt — no pipeline, no phases. No action needed from you — events arrive via hooks.
 
 ## Status Dashboard
 
@@ -92,7 +94,7 @@ Use `fleet send <name> "<command>"` for edge cases. Only works when the session 
 
 Fleet events are push-based via Claude Code hooks. Feature sessions automatically push events (PR created, idle, needs input, context warning) to `~/.claude/fleet/events.jsonl`. A `UserPromptSubmit` hook injects new events into the orchestrator's context on every user message.
 
-You don't need to poll or run a monitor. Events arrive automatically. When you see fleet events in the context, react to them: update the registry, advance phases, alert the user, or take action as needed.
+You don't need to poll, sleep, or run background checks. NEVER run `sleep` or polling loops — this blocks the session. Events arrive automatically via hooks on every user message. When you see "Fleet Events" in the context, react to them: update the registry, advance phases, alert the user, or take action. Between user messages, do nothing — just respond and stop.
 
 ## Context Window Management
 
