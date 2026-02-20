@@ -31,7 +31,7 @@ case "$EVENT" in
       PR_URL=$(echo "$RESPONSE" | grep -oE 'https://github\.com/[^ ]+/pull/[0-9]+' | head -1)
       [ -n "$PR_URL" ] && echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"pr_created\",\"url\":\"$PR_URL\"}" >> "$EVENTS_FILE"
     elif echo "$COMMAND" | grep -q 'git push'; then
-      BRANCH=$(echo "$COMMAND" | grep -oE '[^ ]+$')
+      BRANCH=$(echo "$COMMAND" | grep -oE '[-a-zA-Z0-9_/]+$')
       echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"pushed\",\"branch\":\"$BRANCH\"}" >> "$EVENTS_FILE"
     fi
     ;;
