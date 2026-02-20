@@ -517,6 +517,21 @@ fleet.command("recover")
     }
   })
 
+fleet.command("prune")
+  .description("Prune events.jsonl to the last N events")
+  .option("--keep <n>", "Number of recent events to keep", "50")
+  .action((opts) => {
+    const keep = parseInt(opts.keep)
+    if (!existsSync(EVENTS)) { console.log("No events file"); return }
+    const lines = readFileSync(EVENTS, "utf-8").split("\n").filter(Boolean)
+    const before = lines.length
+    const pruned = lines.slice(-keep)
+    writeFileSync(EVENTS, pruned.join("\n") + "\n")
+    const newSize = Buffer.byteLength(pruned.join("\n") + "\n")
+    writeFileSync(join(FLEET_DIR, ".events_offset"), String(newSize))
+    console.log(`PRUNED: ${before} -> ${pruned.length} events (offset reset to ${newSize})`)
+  })
+
 fleet.command("desc")
   .description("Update feature description (and picker label)")
   .argument("<name>", "Feature name")
