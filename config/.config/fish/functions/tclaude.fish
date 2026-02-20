@@ -1,11 +1,22 @@
 function tclaude --description "Claude Code workspace with dev layout"
-    argparse n/new -- $argv
+    argparse n/new o/orchestrator -- $argv
     or return 1
+
+    if set -q _flag_orchestrator
+        set -l session_name fleet-orchestrator
+
+        if not tmux has-session -t $session_name 2>/dev/null
+            tmux new-session -d -s $session_name -n "claude" -c $HOME
+            tmux set-option -t $session_name @fleet_orchestrator 1
+        end
+        _tclaude_ensure_claude $session_name
+        _tclaude_attach $session_name
+        return
+    end
 
     set -l base_name (basename $PWD | tr . _)-workspace
     set -l dev_cmd $argv[1]
 
-    # Track this directory in zoxide so it appears in the session picker
     zoxide add $PWD 2>/dev/null
 
     if set -q _flag_new
@@ -17,30 +28,34 @@ function tclaude --description "Claude Code workspace with dev layout"
     end
 
     if not tmux has-session -t $base_name 2>/dev/null
-        # Create session with Claude window (full screen)
         tmux new-session -d -s $base_name -n "claude" -c $PWD
+        tmux set-option -t $base_name @claude_task (basename $PWD)
         tmux send-keys -t "$base_name:claude" "claude --dangerously-skip-permissions" C-m
 
-        # Create dev window only if dev command provided
         if test -n "$dev_cmd"
             tmux new-window -t $base_name -n "dev" -c $PWD
             tmux split-window -v -t "$base_name:dev" -p 50 -c $PWD
             tmux send-keys -t "$base_name:dev.1" "$dev_cmd" C-m
-            # Focus back on Claude window
             tmux select-window -t "$base_name:claude"
         end
     else
-        # Session exists — check if Claude is running in it
-        # Handles restored sessions from resurrect where panes are empty
-        set -l pane_cmd (tmux list-panes -t "$base_name:claude" -F '#{pane_current_command}' 2>/dev/null | head -1)
-        if test "$pane_cmd" != claude
-            tmux send-keys -t "$base_name:claude" "claude --dangerously-skip-permissions" C-m
-        end
+        _tclaude_ensure_claude $base_name
     end
 
+    _tclaude_attach $base_name
+end
+
+function _tclaude_ensure_claude
+    set -l pane_cmd (tmux list-panes -t "$argv[1]:claude" -F '#{pane_current_command}' 2>/dev/null | head -1)
+    if test "$pane_cmd" != claude
+        tmux send-keys -t "$argv[1]:claude" "claude --dangerously-skip-permissions" C-m
+    end
+end
+
+function _tclaude_attach
     if test -z "$TMUX"
-        tmux attach-session -t $base_name
+        tmux attach-session -t $argv[1]
     else
-        tmux switch-client -t $base_name
+        tmux switch-client -t $argv[1]
     end
 end

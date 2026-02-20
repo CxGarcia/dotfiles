@@ -4,7 +4,7 @@
 CURRENT_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null)
 CURRENT_SESSION_ID=$(tmux display-message -p '#{session_id}' 2>/dev/null)
 
-# Clean up stale _picker_ sessions (created by ts.fish for out-of-tmux invocations)
+# Clean up stale _picker_ sessions
 tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^_picker_' | while read -r s; do
     [[ "$s" != "$CURRENT_SESSION" ]] && tmux kill-session -t "$s" 2>/dev/null
 done
@@ -21,14 +21,20 @@ go_to_session() {
 COLORS="bg+:#2d3843,fg:#908caa,fg+:#e0def4,hl:#ebbcba,hl+:#ebbcba"
 COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#ebbcba"
 
-# ── Subcommands (called by fzf binds) ───────────────────────────────
-
 list_sessions() {
+    # Orchestrator first in output = bottom in fzf --layout=reverse
+    tmux list-sessions -F '#{session_id} #{session_name}' 2>/dev/null | while read -r id name; do
+        [[ "$name" == "$CURRENT_SESSION" ]] && continue
+        [[ "$(tmux show-option -qv -t "$name" @fleet_orchestrator 2>/dev/null)" != "1" ]] && continue
+        task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null)
+        [[ -z "$task" ]] && task="Fleet Orchestrator"
+        printf '%s\t%s\t⚡ %s\t%s\n' "$id" "$name" "$task" "fleet"
+    done
     tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' |
         sort -rn | while read -r _ id name; do
             [[ "$name" == "$CURRENT_SESSION" || "$name" == _picker_* ]] && continue
-            task=$(tmux display-message -t "$id:=claude" -p '#{pane_title}' 2>/dev/null)
-            task=${task#*[[:space:]]}
+            [[ "$(tmux show-option -qv -t "$name" @fleet_orchestrator 2>/dev/null)" == "1" ]] && continue
+            task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null)
             repo=$(basename "$(tmux display-message -t "$id:=claude" -p '#{pane_current_path}' 2>/dev/null)" 2>/dev/null)
             [[ -z "$task" ]] && task="$name"
             printf '%s\t%s\t%s\t%s\n' "$id" "$name" "$task" "$repo"
@@ -47,8 +53,6 @@ esac
 
 SELF="bash $0"
 
-# ── Window mode ──────────────────────────────────────────────────────
-
 if [[ "${1:-}" == "--windows" ]]; then
     selected=$(
         tmux list-windows -a -F '#{session_name}:#{window_index} #{window_name}' |
@@ -58,15 +62,9 @@ if [[ "${1:-}" == "--windows" ]]; then
             --color="$COLORS" --no-border --no-sort --no-separator --header=" " --layout=reverse --padding=0,3
     ) || exit 0
     target_win="$(echo "$selected" | cut -d' ' -f1)"
-    if [[ -n "$TMUX" ]]; then
-        tmux switch-client -t "$target_win"
-    else
-        tmux attach-session -t "$target_win"
-    fi
+    go_to_session "$target_win" "$target_win"
     exit 0
 fi
-
-# ── Session picker ───────────────────────────────────────────────────
 
 PREVIEW_SESSION='tmux capture-pane -ep -t "$(echo {} | cut -f1):=claude" 2>/dev/null'
 PREVIEW_DIR='ls -1 --color=always {2} 2>/dev/null || ls -1G {2} 2>/dev/null'
@@ -89,27 +87,23 @@ selected=$(
 
 query=$(echo "$selected" | sed -n '1p')
 choice=$(echo "$selected" | sed -n '2p')
-# Use stable session ID (field 1) when a session was selected, fall back to query for new sessions
 target=$([[ -n "$choice" ]] && echo "$choice" | cut -f1 || echo "")
 name=$([[ -n "$choice" ]] && echo "$choice" | cut -f2 || echo "$query")
 [[ -z "$target" && -z "$name" ]] && exit 0
 
-# ── Act on selection ─────────────────────────────────────────────────
-
-# Existing session → switch using stable session ID
+# Existing session -- switch using stable session ID
 if [[ -n "$target" ]]; then
     go_to_session "$target:=claude" "$target"
     exit 0
 fi
 
-# Resolve to a directory: use directly if path, otherwise zoxide lookup
+# No session matched -- resolve query to a directory and create a new workspace
 if [[ -d "$name" ]]; then
     work_dir="$name"
 else
     work_dir=$(zoxide query "$name" 2>/dev/null || echo "$HOME")
 fi
 
-# Create Claude workspace session from resolved directory (always new)
 base_name="$(basename "$work_dir" | tr '.' '_')"
 session_name="$base_name"
 n=2
@@ -118,6 +112,7 @@ while tmux has-session -t="$session_name" 2>/dev/null; do
     n=$((n + 1))
 done
 tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
+tmux set-option -t "$session_name" @claude_task "$(basename "$work_dir")"
 tmux send-keys -t "$session_name:=claude" "claude --dangerously-skip-permissions" C-m
 zoxide add "$work_dir" 2>/dev/null
 go_to_session "$session_name:=claude" "$session_name"
