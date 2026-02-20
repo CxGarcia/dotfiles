@@ -346,12 +346,16 @@ cmd_status() {
     local live_state
     live_state=$(check_session_state "$session_id")
 
-    local pr_info=""
+    local pr_info="" pr_url=""
     local pr_num
     pr_num=$(echo "$feat" | jq -r '.pr.number // empty')
     if [ -n "$pr_num" ]; then
       local ci
       ci=$(echo "$feat" | jq -r '.pr.ciStatus // "unknown"')
+      pr_url=$(echo "$feat" | jq -r '.pr.url // empty')
+      if [ -z "$pr_url" ]; then
+        pr_url=$(gh pr view "$pr_num" --repo "$repo_path" --json url -q .url 2>/dev/null || echo "")
+      fi
       pr_info="PR #$pr_num ($ci)"
     fi
 
@@ -362,7 +366,7 @@ cmd_status() {
       [ "$title" = "Claude Code" ] && title=""
     fi
 
-    echo "NAME=$name PHASE=$phase STATUS=$status LIVE=$live_state REPO=$repo_name PR=$pr_info TASK=$title"
+    echo "NAME=$name PHASE=$phase STATUS=$status LIVE=$live_state REPO=$repo_name PR=$pr_info PR_URL=$pr_url TASK=$title"
   done <<< "$features"
 }
 
