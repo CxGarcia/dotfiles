@@ -194,6 +194,11 @@ check_session_state() {
     return
   fi
 
+  if echo "$content" | grep -qE '(↑/↓|↑↓).*select|to select.*Enter|Space to select'; then
+    echo "picker"
+    return
+  fi
+
   if echo "$content" | grep -qE '(ctrl\+c to interrupt|·.*tokens)'; then
     echo "working"
     return
@@ -253,7 +258,23 @@ cmd_spawn() {
     n=$((n + 1))
   done
 
-  tmux new-session -d -s "$session_name" -n claude -c "$repo"
+  # Create worktree directly (reliable, no tmux send-keys fragility)
+  local worktree_path="$repo/.claude/worktrees/$name"
+  local branch="worktree-$name"
+  if [ -d "$worktree_path" ]; then
+    echo "WORKTREE_EXISTS: $worktree_path"
+  else
+    local default_branch
+    default_branch=$(git -C "$repo" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    [ -z "$default_branch" ] && default_branch="main"
+    git -C "$repo" fetch origin "$default_branch" --quiet 2>/dev/null || true
+    mkdir -p "$repo/.claude/worktrees"
+    git -C "$repo" worktree add -b "$branch" "$worktree_path" "origin/$default_branch" 2>&1
+    echo "WORKTREE_CREATED: $worktree_path (branch: $branch)"
+  fi
+
+  # Start session IN the worktree directory
+  tmux new-session -d -s "$session_name" -n claude -c "$worktree_path"
   tmux set-option -t "$session_name" @fleet_managed 1
   [ -n "$description" ] && tmux set-option -t "$session_name" @claude_task "$description"
 
@@ -262,11 +283,12 @@ cmd_spawn() {
 
   echo "SESSION_CREATED: $session_name (id: $session_id)"
 
-  tmux_send "$session_name" "claude -w $name --dangerously-skip-permissions"
+  # Start Claude without -w (worktree already set up)
+  tmux_send "$session_name" "claude --dangerously-skip-permissions"
 
   echo "WAITING_FOR_CLAUDE..."
-  if ! wait_for_ready "$session_name" 90; then
-    echo "ERROR: Claude did not become ready within 90s" >&2
+  if ! wait_for_ready "$session_name" 120; then
+    echo "ERROR: Claude did not become ready within 120s" >&2
     echo "SESSION: $session_name (you can attach manually)" >&2
     exit 1
   fi
@@ -412,6 +434,69 @@ cmd_send() {
   session_name=$(echo "$feat" | jq -r '.tmuxSession')
   tmux_send "$session_name" "$command"
   echo "SENT: $command"
+}
+
+cmd_pick() {
+  local name="$1"
+  local choice="$2"
+
+  if [ -z "$name" ] || [ -z "$choice" ]; then
+    echo "ERROR: Usage: fleet pick <name> <number>" >&2
+    echo "  Sends a number key to select an option in a Claude Code picker." >&2
+    echo "  Example: fleet pick myfeature 1" >&2
+    exit 1
+  fi
+
+  local feat
+  feat=$(require_feature "$name")
+
+  local session_id
+  session_id=$(echo "$feat" | jq -r '.tmuxSessionId')
+  local state
+  state=$(check_session_state "$session_id")
+
+  if [ "$state" != "picker" ]; then
+    echo "ERROR: Session is not showing a picker (state: $state)." >&2
+    echo "  Use 'fleet check $name' to see the current pane output." >&2
+    exit 1
+  fi
+
+  local session_name
+  session_name=$(echo "$feat" | jq -r '.tmuxSession')
+
+  if [[ "$choice" =~ ^[0-9]+$ ]]; then
+    tmux send-keys -t "$session_name:claude" "$choice"
+    echo "PICKED: option $choice"
+  else
+    echo "ERROR: Choice must be a number (e.g., 1, 2, 3)" >&2
+    exit 1
+  fi
+}
+
+cmd_keys() {
+  local name="$1"
+  shift
+  local keys="$*"
+
+  if [ -z "$name" ] || [ -z "$keys" ]; then
+    echo "ERROR: Usage: fleet keys <name> <key> [key...]" >&2
+    echo "  Sends raw tmux key names to the session (no -l flag)." >&2
+    echo "  Examples:" >&2
+    echo "    fleet keys myfeature Down Down Enter" >&2
+    echo "    fleet keys myfeature Escape" >&2
+    echo "    fleet keys myfeature y" >&2
+    exit 1
+  fi
+
+  local feat
+  feat=$(require_feature "$name")
+
+  local session_name
+  session_name=$(echo "$feat" | jq -r '.tmuxSession')
+
+  # shellcheck disable=SC2086
+  tmux send-keys -t "$session_name:claude" $keys
+  echo "KEYS_SENT: $keys"
 }
 
 cmd_advance() {
@@ -711,6 +796,8 @@ case "${1:-help}" in
   status) cmd_status ;;
   check) shift; cmd_check "$@" ;;
   send) shift; cmd_send "$@" ;;
+  pick) shift; cmd_pick "$@" ;;
+  keys) shift; cmd_keys "$@" ;;
   advance) shift; cmd_advance "$@" ;;
   kill) shift; cmd_kill "$@" ;;
   list) cmd_list ;;
@@ -726,6 +813,8 @@ case "${1:-help}" in
     echo "  status                 dashboard of all active features"
     echo "  check <name>           detailed state of one feature"
     echo "  send <name> <command>  send command to idle session"
+    echo "  pick <name> <number>  select option N in a Claude Code picker"
+    echo "  keys <name> <key...>  send raw tmux keys (Down, Enter, Escape, etc.)"
     echo "  advance <name>         advance to next pipeline phase"
     echo "  kill <name>            cleanup session, worktree, branch"
     echo "  list                   list fleet-managed tmux sessions"
