@@ -5,6 +5,13 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rea
 import { join, basename, resolve } from "path"
 import { homedir } from "os"
 
+const FMT_CMD = "#{pane_current_command}"
+const FMT_DEAD = "#{pane_dead}"
+const FMT_DEAD_STATUS = "#{pane_dead_status}"
+const FMT_SESSION_ID = "#{session_id}"
+const FMT_PANE_TITLE = "#{pane_title}"
+const FMT_SESSIONS = "#{session_id} #{session_name}"
+
 const FLEET_DIR = join(homedir(), ".claude", "fleet")
 const REGISTRY = join(FLEET_DIR, "registry.json")
 const EVENTS = join(FLEET_DIR, "events.jsonl")
@@ -89,7 +96,7 @@ async function sessionExists(target: string): Promise<boolean> {
 async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
   const target = `${session}:claude`
   for (let elapsed = 0; elapsed < maxWait; elapsed += 2) {
-    const cmd = (await $`tmux display-message -t ${target} -p #\{pane_current_command\}`.quiet().nothrow()).text().trim()
+    const cmd = (await $`tmux display-message -t ${target} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
     if (cmd === "claude") {
       const content = (await $`tmux capture-pane -t ${target} -p -S -5`.quiet().nothrow()).text()
       const hasPrompt = content.includes("❯")
@@ -107,12 +114,12 @@ async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
 async function checkSessionState(target: string): Promise<string> {
   if (!await sessionExists(target)) return "gone"
 
-  const cmd = (await $`tmux display-message -t ${target} -p #\{pane_current_command\}`.quiet().nothrow()).text().trim()
+  const cmd = (await $`tmux display-message -t ${target} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
 
   if (cmd !== "claude") {
-    const dead = (await $`tmux display-message -t ${target} -p #\{pane_dead\}`.quiet().nothrow()).text().trim()
+    const dead = (await $`tmux display-message -t ${target} -p ${FMT_DEAD}`.quiet().nothrow()).text().trim()
     if (dead === "1") {
-      const code = (await $`tmux display-message -t ${target} -p #\{pane_dead_status\}`.quiet().nothrow()).text().trim()
+      const code = (await $`tmux display-message -t ${target} -p ${FMT_DEAD_STATUS}`.quiet().nothrow()).text().trim()
       return code === "0" ? "exited" : `crashed:${code}`
     }
     return "exited"
@@ -216,7 +223,7 @@ fleet.command("spawn")
     await $`tmux set-option -w -t ${sessionName}:2 monitor-activity off`.quiet().nothrow()
     await $`tmux select-window -t ${sessionName}:1`.quiet().nothrow()
 
-    const sessionId = (await $`tmux display-message -t ${sessionName} -p #\{session_id\}`.quiet()).text().trim()
+    const sessionId = (await $`tmux display-message -t ${sessionName} -p ${FMT_SESSION_ID}`.quiet()).text().trim()
     console.log(`SESSION_CREATED: ${sessionName} (id: ${sessionId})`)
 
     await tmuxSend(sessionName, "claude --dangerously-skip-permissions")
@@ -292,7 +299,7 @@ fleet.command("status")
 
       let title = ""
       if (liveState !== "gone") {
-        title = (await $`tmux display-message -t ${feat.tmuxSessionId} -p #\{pane_title\}`.quiet().nothrow()).text().trim()
+        title = (await $`tmux display-message -t ${feat.tmuxSessionId} -p ${FMT_PANE_TITLE}`.quiet().nothrow()).text().trim()
         title = title.replace(/^.*?\s/, "")
         if (title === "Claude Code") title = ""
       }
@@ -459,14 +466,14 @@ fleet.command("kill")
 fleet.command("list")
   .description("List fleet-managed tmux sessions")
   .action(async () => {
-    const sessions = (await $`tmux list-sessions -F #\{session_id\} #\{session_name\}`.quiet().nothrow()).text().trim()
+    const sessions = (await $`tmux list-sessions -F ${FMT_SESSIONS}`.quiet().nothrow()).text().trim()
     if (!sessions) return
 
     for (const line of sessions.split("\n")) {
       const [id, sname] = line.split(" ")
       const managed = (await $`tmux show-option -qv -t ${sname} @fleet_managed`.quiet().nothrow()).text().trim()
       if (managed === "1") {
-        const cmd = (await $`tmux display-message -t ${sname} -p #\{pane_current_command\}`.quiet().nothrow()).text().trim()
+        const cmd = (await $`tmux display-message -t ${sname} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
         console.log(`ID=${id} NAME=${sname} CMD=${cmd}`)
       }
     }
@@ -488,7 +495,7 @@ fleet.command("recover")
       const sessionAlive = await sessionExists(feat.tmuxSessionId)
       let claudeRunning = false
       if (sessionAlive) {
-        const cmd = (await $`tmux display-message -t ${feat.tmuxSessionId} -p #\{pane_current_command\}`.quiet().nothrow()).text().trim()
+        const cmd = (await $`tmux display-message -t ${feat.tmuxSessionId} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
         claudeRunning = cmd === "claude"
       }
       const worktreeExists = existsSync(feat.worktreePath)
