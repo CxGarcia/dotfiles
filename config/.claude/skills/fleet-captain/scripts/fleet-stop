@@ -13,7 +13,7 @@ echo "$CWD" | grep -q '\.claude/worktrees/' && exit 0
 FLEET_DIR="$HOME/.claude/fleet"
 REGISTRY="$FLEET_DIR/registry.json"
 EVENTS_FILE="$FLEET_DIR/events.jsonl"
-OFFSET_FILE="$FLEET_DIR/.captain_stop_offset"
+OFFSET_FILE="$FLEET_DIR/.events_offset"
 STATE_DIR="$FLEET_DIR/state"
 
 [ -f "$REGISTRY" ] || exit 0
