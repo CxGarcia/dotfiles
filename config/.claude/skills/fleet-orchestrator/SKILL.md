@@ -16,7 +16,11 @@ Manage concurrent feature sessions. Each feature runs autonomously in its own tm
 
 All operations go through `scripts/fleet`. Never run tmux commands directly.
 
-**NEVER** run `sleep`, polling loops, or background checks to watch sessions. Feature sessions push events to you automatically via hooks — you will see them as "Fleet Events" at the start of user messages. Respond to the user and stop. Do not block the session.
+## How Events Work
+
+Feature sessions push events (PR created, idle, needs input, context warning) to `~/.claude/fleet/events.jsonl` via Claude Code hooks. A `UserPromptSubmit` hook reads new events and injects them into your context automatically on every user message.
+
+This means you receive updates passively — when the user talks to you, you see what happened since last time. You don't need to actively watch sessions. Use `fleet check` or `fleet status` when you need to inspect something, not to wait for changes.
 
 ## CLI Reference
 
@@ -52,11 +56,9 @@ In **phased mode**, advance through the pipeline using `fleet advance <name>`:
 | simplify -> pr_monitoring | Auto-advance |
 | pr_monitoring -> done | User merges PR |
 
-Use `fleet check <name>` only when the user asks about a specific feature.
+In **slfg mode**, the feature runs end-to-end autonomously. Events arrive via hooks as the session progresses.
 
-In **slfg mode**, the feature runs end-to-end autonomously. No action needed from you — events arrive via hooks.
-
-In **fix mode**, the description is sent as a plain prompt — no pipeline, no phases. No action needed from you — events arrive via hooks.
+In **fix mode**, the description is sent as a plain prompt — no pipeline, no phases. Events arrive via hooks when the session finishes or needs input.
 
 ## Status Dashboard
 
@@ -90,15 +92,8 @@ Run `fleet recover` on startup or after a crash. Reconciles the registry with li
 
 Use `fleet send <name> "<command>"` for edge cases. Only works when the session is idle.
 
-## Event Hooks
-
-Fleet events are push-based via Claude Code hooks. Feature sessions automatically push events (PR created, idle, needs input, context warning) to `~/.claude/fleet/events.jsonl`. A `UserPromptSubmit` hook injects new events into the orchestrator's context on every user message.
-
-You don't need to poll, sleep, or run background checks. NEVER run `sleep` or polling loops — this blocks the session. Events arrive automatically via hooks on every user message. When you see "Fleet Events" in the context, react to them: update the registry, advance phases, alert the user, or take action. Between user messages, do nothing — just respond and stop.
-
 ## Context Window Management
 
-- Prefer `fleet status` over `fleet check <name>` unless the user asks for detail on a specific feature
 - The registry (`~/.claude/fleet/registry.json`) is external memory -- access it via `fleet` commands, don't hold feature state in conversation
 - When context grows large, tell the user to restart. `fleet recover` picks up seamlessly.
 
