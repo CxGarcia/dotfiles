@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# fleet-stop — Stop hook for the captain session
+# Polls for fleet events before letting the captain go idle.
+# If events arrive within the poll window, blocks stopping and injects them.
+
+INPUT=$(cat)
+STOP_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+
+# Only run on the captain session (not in worktrees = not a feature session)
+echo "$CWD" | grep -q '\.claude/worktrees/' && exit 0
+
+FLEET_DIR="$HOME/.claude/fleet"
+REGISTRY="$FLEET_DIR/registry.json"
+EVENTS_FILE="$FLEET_DIR/events.jsonl"
+OFFSET_FILE="$FLEET_DIR/.captain_stop_offset"
+STATE_DIR="$FLEET_DIR/state"
+
+[ -f "$REGISTRY" ] || exit 0
+mkdir -p "$STATE_DIR"
+
+check_session_state() {
+  local session="$1"
+  tmux has-session -t "$session" 2>/dev/null || { echo "gone"; return; }
+  local cmd
+  cmd=$(tmux display-message -t "$session" -p '#{pane_current_command}' 2>/dev/null)
+  if [ "$cmd" != "claude" ]; then
+    local dead
+    dead=$(tmux display-message -t "$session" -p '#{pane_dead}' 2>/dev/null)
+    [ "$dead" = "1" ] && echo "crashed" || echo "exited"
+    return
+  fi
+  local content
+  content=$(tmux capture-pane -t "$session:claude" -p -S -10 2>/dev/null)
+  if echo "$content" | grep -qE '\[y/n\]|\[Y/n\]|\[yes/no\]'; then echo "blocked"; return; fi
+  if echo "$content" | grep -qE '(↑/↓|↑↓).*select|to select.*Enter|Space to select'; then echo "picker"; return; fi
+  if echo "$content" | grep -qE '(ctrl\+c to interrupt|·.*tokens)'; then echo "working"; return; fi
+  if echo "$content" | grep -q '❯'; then echo "idle"; return; fi
+  echo "unknown"
+}
+
+collect_updates() {
+  local output=""
+
+  # Discrete events from hooks
+  if [ -f "$EVENTS_FILE" ]; then
+    local current_size last_offset
+    current_size=$(wc -c < "$EVENTS_FILE" | tr -d ' ')
+    last_offset=0
+    [ -f "$OFFSET_FILE" ] && last_offset=$(cat "$OFFSET_FILE")
+    if [ "$current_size" -gt "$last_offset" ]; then
+      local new_events
+      new_events=$(tail -c +"$((last_offset + 1))" "$EVENTS_FILE")
+      echo "$current_size" > "$OFFSET_FILE"
+      if [ -n "$new_events" ]; then
+        local formatted
+        formatted=$(echo "$new_events" | jq -s 'group_by(.feature + ":" + .event) | map(last) | sort_by(.ts)' 2>/dev/null | jq -r '.[] |
+          if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
+          elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
+          elif .event == "context_warning" then "  \(.feature): context compacting"
+          else "  \(.feature): \(.event)"
+          end' 2>/dev/null)
+        [ -n "$formatted" ] && output="$formatted"
+      fi
+    fi
+  fi
+
+  # State changes via tmux
+  local features
+  features=$(jq -r '.features | to_entries[] | select(.value.status == "active" or .value.status == "blocked") | "\(.key)\t\(.value.tmuxSession)"' "$REGISTRY" 2>/dev/null)
+  if [ -n "$features" ]; then
+    while IFS=$'\t' read -r name session; do
+      [ -z "$name" ] && continue
+      local current prev
+      current=$(check_session_state "$session")
+      prev=""
+      [ -f "$STATE_DIR/$name.state" ] && prev=$(cat "$STATE_DIR/$name.state")
+      if [ "$current" != "$prev" ]; then
+        echo "$current" > "$STATE_DIR/$name.state.tmp"
+        mv "$STATE_DIR/$name.state.tmp" "$STATE_DIR/$name.state"
+        case "$current" in
+          idle)    output="$output
+  $name: now idle (was ${prev:-unknown})" ;;
+          blocked) output="$output
+  $name: NEEDS INPUT (blocked)" ;;
+          picker)  output="$output
+  $name: NEEDS SELECTION (picker)" ;;
+          exited)  output="$output
+  $name: session exited" ;;
+          crashed) output="$output
+  $name: session CRASHED" ;;
+          gone)    output="$output
+  $name: session gone" ;;
+        esac
+      fi
+    done <<< "$features"
+  fi
+
+  echo "$output" | sed '/^$/d'
+}
+
+# If already continuing from a previous stop hook, check once and done
+if [ "$STOP_ACTIVE" = "true" ]; then
+  updates=$(collect_updates)
+  if [ -n "$updates" ]; then
+    count=$(echo "$updates" | wc -l | tr -d ' ')
+    jq -n --arg reason "Fleet events ($count new):
+$updates
+React to these events — inform the user of anything important." \
+      '{"decision":"block","reason":$reason}'
+  else
+    exit 0
+  fi
+  exit 0
+fi
+
+# First stop: poll for 5 minutes (60 checks at 5s intervals)
+for i in $(seq 1 60); do
+  updates=$(collect_updates)
+  if [ -n "$updates" ]; then
+    count=$(echo "$updates" | wc -l | tr -d ' ')
+    jq -n --arg reason "Fleet events ($count new):
+$updates
+React to these events — inform the user of anything important." \
+      '{"decision":"block","reason":$reason}'
+    exit 0
+  fi
+  sleep 5
+done
+
+# Nothing in 5 minutes — let the captain sleep
+exit 0
