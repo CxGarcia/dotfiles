@@ -27,7 +27,6 @@ fleet advance <name>                                       # advance to next pip
 fleet kill <name>                                          # full cleanup
 fleet list                                                 # list fleet-managed tmux sessions
 fleet recover                                              # reconcile registry after restart
-fleet monitor [--interval N]                               # background poller
 ```
 
 ## Spawning
@@ -89,20 +88,11 @@ Run `fleet recover` on startup or after a crash. Reconciles the registry with li
 
 Use `fleet send <name> "<command>"` for edge cases. Only works when the session is idle.
 
-## Background Monitoring
+## Event Hooks
 
-Run `fleet monitor --interval 30` with `run_in_background: true`. Save the returned `task_id`. The monitor polls sessions, auto-advances phases per the table above, pauses at work->review, detects blocked/crashed sessions, and tracks PR CI status.
+Fleet events are push-based via Claude Code hooks. Feature sessions automatically push events (PR created, idle, needs input, context warning) to `~/.claude/fleet/events.jsonl`. A `UserPromptSubmit` hook injects new events into the orchestrator's context on every user message.
 
-Check for alerts using `TaskOutput` with `block: false` on the task_id. Alert format:
-```
-ALERT PHASE_COMPLETE auth-sso phase=brainstorm
-AUTO_ADVANCING auth-sso from brainstorm
-ALERT BLOCKED cart-redesign phase=brainstorm (needs user input)
-ALERT CI_PASSED api-pagination PR #234 — ready to merge
-ALERT PR_MERGED api-pagination PR #234
-```
-
-After each user message, check monitor output and act on alerts before responding. The monitor is a tool, not a daemon -- start it when watching sessions (e.g., after spawning features and the user steps away), don't run it by default.
+You don't need to poll or run a monitor. Events arrive automatically. When you see fleet events in the context, react to them: update the registry, advance phases, alert the user, or take action as needed.
 
 ## Context Window Management
 
