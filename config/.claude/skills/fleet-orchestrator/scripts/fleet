@@ -277,7 +277,7 @@ fleet.command("status")
 
     console.log("FEATURES:")
     for (const [name, feat] of active) {
-      const liveState = await checkSessionState(feat.tmuxSessionId)
+      const liveState = await checkSessionState(feat.tmuxSession)
       const repoName = basename(feat.repo)
 
       let prInfo = ""
@@ -306,7 +306,7 @@ fleet.command("check")
   .argument("<name>", "Feature name")
   .action(async (name) => {
     const feat = requireFeature(name)
-    const state = await checkSessionState(feat.tmuxSessionId)
+    const state = await checkSessionState(feat.tmuxSession)
     console.log(`FEATURE=${name} PHASE=${feat.phase} STATE=${state}`)
 
     if (["idle", "working", "blocked", "picker"].includes(state)) {
@@ -322,7 +322,7 @@ fleet.command("send")
   .argument("<command...>", "Command text to send")
   .action(async (name, command) => {
     const feat = requireFeature(name)
-    const state = await checkSessionState(feat.tmuxSessionId)
+    const state = await checkSessionState(feat.tmuxSession)
     if (state !== "idle") {
       console.error(`ERROR: Session is not idle (state: ${state}). Cannot send command.`)
       process.exit(1)
@@ -341,7 +341,7 @@ fleet.command("pick")
       process.exit(1)
     }
     const feat = requireFeature(name)
-    const state = await checkSessionState(feat.tmuxSessionId)
+    const state = await checkSessionState(feat.tmuxSession)
     if (state !== "picker") {
       console.error(`ERROR: Session is not showing a picker (state: ${state}).`)
       console.error(`  Use 'fleet check ${name}' to see the current pane output.`)
@@ -372,7 +372,7 @@ fleet.command("advance")
       process.exit(1)
     }
 
-    const state = await checkSessionState(feat.tmuxSessionId)
+    const state = await checkSessionState(feat.tmuxSession)
     if (state !== "idle") {
       console.error(`ERROR: Session is not idle (state: ${state}). Wait for current phase to complete.`)
       process.exit(1)
@@ -532,7 +532,7 @@ fleet.command("monitor")
       const active = Object.entries(reg.features).filter(([, f]) => f.status === "active" || f.status === "blocked")
 
       for (const [name, feat] of active) {
-        const liveState = await checkSessionState(feat.tmuxSessionId)
+        const liveState = await checkSessionState(feat.tmuxSession)
         const prev = prevStates.get(name)
         if (liveState === prev) continue
 
