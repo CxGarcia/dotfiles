@@ -210,6 +210,12 @@ fleet.command("spawn")
     await $`tmux set-option -t ${sessionName} @fleet_managed 1`.quiet()
     if (description) await $`tmux set-option -t ${sessionName} @claude_task ${description}`.quiet()
 
+    // Create util window at index 2 in the base repo (not the worktree)
+    await $`tmux new-window -d -t ${sessionName}:2 -n util -c ${repo}`.quiet().nothrow()
+    await $`tmux split-window -d -v -t ${sessionName}:2 -c ${repo}`.quiet().nothrow()
+    await $`tmux set-option -w -t ${sessionName}:2 monitor-activity off`.quiet().nothrow()
+    await $`tmux select-window -t ${sessionName}:1`.quiet().nothrow()
+
     const sessionId = (await $`tmux display-message -t ${sessionName} -p #\{session_id\}`.quiet()).text().trim()
     console.log(`SESSION_CREATED: ${sessionName} (id: ${sessionId})`)
 
