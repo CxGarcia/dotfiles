@@ -272,7 +272,7 @@ fleet.command("spawn")
   })
 
 fleet.command("status")
-  .description("Dashboard of all active features")
+  .description("Snapshot of all active features with live state and pane content")
   .action(async () => {
     const reg = readRegistry()
     const active = Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
@@ -282,29 +282,55 @@ fleet.command("status")
       return
     }
 
-    console.log("FEATURES:")
     for (const [name, feat] of active) {
       const liveState = await checkSessionState(feat.tmuxSession)
       const repoName = basename(feat.repo)
 
-      let prInfo = ""
-      let prUrl = ""
+      console.log(`--- ${name} ---`)
+      console.log(`phase=${feat.phase} live=${liveState} repo=${repoName}`)
+
       if (feat.pr) {
-        prInfo = `PR #${feat.pr.number} (${feat.pr.ciStatus ?? "unknown"})`
-        prUrl = feat.pr.url ?? ""
-        if (!prUrl) {
-          prUrl = (await $`gh pr view ${feat.pr.number} --repo ${feat.repo} --json url -q .url`.quiet().nothrow()).text().trim()
+        const prUrl = feat.pr.url ?? (await $`gh pr view ${feat.pr.number} --repo ${feat.repo} --json url -q .url`.quiet().nothrow()).text().trim()
+        console.log(`pr=#${feat.pr.number} ci=${feat.pr.ciStatus ?? "unknown"} url=${prUrl}`)
+      }
+
+      if (["idle", "blocked", "picker"].includes(liveState)) {
+        const content = (await $`tmux capture-pane -t ${feat.tmuxSession}:claude -p -S -20`.quiet().nothrow()).text().trim()
+        if (content) {
+          console.log("pane:")
+          console.log(content)
         }
       }
 
-      let title = ""
-      if (liveState !== "gone") {
-        title = (await $`tmux display-message -t ${feat.tmuxSessionId} -p ${FMT_PANE_TITLE}`.quiet().nothrow()).text().trim()
-        title = title.replace(/^.*?\s/, "")
-        if (title === "Claude Code") title = ""
-      }
+      console.log("")
+    }
 
-      console.log(`NAME=${name} PHASE=${feat.phase} STATUS=${feat.status} LIVE=${liveState} REPO=${repoName} PR=${prInfo} PR_URL=${prUrl} TASK=${title}`)
+    // Drain pending events
+    const offsetFile = join(FLEET_DIR, ".events_offset")
+    if (existsSync(EVENTS)) {
+      const currentSize = Buffer.byteLength(readFileSync(EVENTS))
+      let lastOffset = 0
+      if (existsSync(offsetFile)) lastOffset = parseInt(readFileSync(offsetFile, "utf-8")) || 0
+
+      if (currentSize > lastOffset) {
+        const content = readFileSync(EVENTS, "utf-8")
+        const newBytes = Buffer.from(content).subarray(lastOffset)
+        const newLines = newBytes.toString().split("\n").filter(Boolean)
+        writeFileSync(offsetFile, String(currentSize))
+
+        if (newLines.length > 0) {
+          console.log("--- events ---")
+          for (const line of newLines) {
+            try {
+              const e = JSON.parse(line)
+              console.log(`  ${e.feature}: ${e.event}${e.url ? " " + e.url : ""}${e.branch ? " " + e.branch : ""}`)
+            } catch {
+              console.log(`  ${line}`)
+            }
+          }
+          console.log("")
+        }
+      }
     }
   })
 
@@ -324,18 +350,18 @@ fleet.command("check")
   })
 
 fleet.command("send")
-  .description("Send a command to an idle session")
+  .description("Send text to a session (delivered immediately, queued by Claude if busy)")
   .argument("<name>", "Feature name")
   .argument("<command...>", "Command text to send")
   .action(async (name, command) => {
     const feat = requireFeature(name)
     const state = await checkSessionState(feat.tmuxSession)
-    if (state !== "idle") {
-      console.error(`ERROR: Session is not idle (state: ${state}). Cannot send command.`)
+    if (state === "gone" || state === "exited" || state.startsWith("crashed")) {
+      console.error(`ERROR: Session is ${state}. Cannot send command.`)
       process.exit(1)
     }
     await tmuxSend(feat.tmuxSession, command.join(" "))
-    console.log(`SENT: ${command.join(" ")}`)
+    console.log(`SENT (state was ${state}): ${command.join(" ")}`)
   })
 
 fleet.command("pick")

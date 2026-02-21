@@ -1,123 +1,41 @@
 #!/usr/bin/env bash
-# fleet-inject — Inject fleet events + session state changes into captain context
-# Runs on UserPromptSubmit. Two responsibilities:
-# 1. Read new discrete events from events.jsonl (PR created, pushed, context warning)
-# 2. Check tmux state for all active sessions and report state changes
+# fleet-inject — Inject discrete fleet events into captain context
+# Runs on UserPromptSubmit. Reads new events from events.jsonl.
 
 FLEET_DIR="$HOME/.claude/fleet"
 EVENTS_FILE="$FLEET_DIR/events.jsonl"
 OFFSET_FILE="$FLEET_DIR/.events_offset"
-STATE_DIR="$FLEET_DIR/state"
 REGISTRY="$FLEET_DIR/registry.json"
 
 [ -f "$REGISTRY" ] || exit 0
-mkdir -p "$STATE_DIR"
+[ -f "$EVENTS_FILE" ] || exit 0
 
-OUTPUT=""
+CURRENT_SIZE=$(wc -c < "$EVENTS_FILE" | tr -d ' ')
+LAST_OFFSET=0
+[ -f "$OFFSET_FILE" ] && LAST_OFFSET=$(cat "$OFFSET_FILE")
 
-# --- Part 1: Discrete events from hooks ---
+[ "$CURRENT_SIZE" -gt "$LAST_OFFSET" ] || exit 0
 
-if [ -f "$EVENTS_FILE" ]; then
-  CURRENT_SIZE=$(wc -c < "$EVENTS_FILE" | tr -d ' ')
-  LAST_OFFSET=0
-  [ -f "$OFFSET_FILE" ] && LAST_OFFSET=$(cat "$OFFSET_FILE")
+NEW_EVENTS=$(tail -c +"$((LAST_OFFSET + 1))" "$EVENTS_FILE")
+echo "$CURRENT_SIZE" > "$OFFSET_FILE"
 
-  if [ "$CURRENT_SIZE" -gt "$LAST_OFFSET" ]; then
-    NEW_EVENTS=$(tail -c +"$((LAST_OFFSET + 1))" "$EVENTS_FILE")
-    echo "$CURRENT_SIZE" > "$OFFSET_FILE"
+[ -n "$NEW_EVENTS" ] || exit 0
 
-    if [ -n "$NEW_EVENTS" ]; then
-      DEDUPED=$(echo "$NEW_EVENTS" | jq -s 'group_by(.feature + ":" + .event) | map(last) | sort_by(.ts)' 2>/dev/null)
-      if [ -n "$DEDUPED" ] && [ "$DEDUPED" != "[]" ]; then
-        FORMATTED=$(echo "$DEDUPED" | jq -r '.[] |
-          if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
-          elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
-          elif .event == "context_warning" then "  \(.feature): context compacting — may lose coherence"
-          else "  \(.feature): \(.event)"
-          end' 2>/dev/null)
-        [ -n "$FORMATTED" ] && OUTPUT="$FORMATTED"
-      fi
-    fi
-  fi
-fi
+DEDUPED=$(echo "$NEW_EVENTS" | jq -s 'group_by(.feature + ":" + .event) | map(last) | sort_by(.ts)' 2>/dev/null)
+[ -n "$DEDUPED" ] && [ "$DEDUPED" != "[]" ] || exit 0
 
-# --- Part 2: Session state changes via tmux ---
+FORMATTED=$(echo "$DEDUPED" | jq -r '.[] |
+  if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
+  elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
+  elif .event == "context_warning" then "  \(.feature): context compacting — may lose coherence"
+  else "  \(.feature): \(.event)"
+  end' 2>/dev/null)
 
-check_session_state() {
-  local session="$1"
-  tmux has-session -t "$session" 2>/dev/null || { echo "gone"; return; }
+[ -n "$FORMATTED" ] || exit 0
 
-  local cmd
-  cmd=$(tmux display-message -t "$session" -p '#{pane_current_command}' 2>/dev/null)
-
-  if [ "$cmd" != "claude" ]; then
-    local dead
-    dead=$(tmux display-message -t "$session" -p '#{pane_dead}' 2>/dev/null)
-    if [ "$dead" = "1" ]; then
-      local code
-      code=$(tmux display-message -t "$session" -p '#{pane_dead_status}' 2>/dev/null)
-      [ "$code" = "0" ] && echo "exited" || echo "crashed"
-    else
-      echo "exited"
-    fi
-    return
-  fi
-
-  local content
-  content=$(tmux capture-pane -t "$session:claude" -p -S -10 2>/dev/null)
-
-  if echo "$content" | grep -qE '\[y/n\]|\[Y/n\]|\[yes/no\]'; then echo "blocked"; return; fi
-  if echo "$content" | grep -qE '(↑/↓|↑↓).*select|to select.*Enter|Space to select'; then echo "picker"; return; fi
-  if echo "$content" | grep -qE '(ctrl\+c to interrupt|·.*tokens)'; then echo "working"; return; fi
-  if echo "$content" | grep -q '❯'; then echo "idle"; return; fi
-
-  echo "unknown"
-}
-
-FEATURES=$(jq -r '.features | to_entries[] | select(.value.status == "active" or .value.status == "blocked") | "\(.key)\t\(.value.tmuxSession)"' "$REGISTRY" 2>/dev/null)
-
-if [ -n "$FEATURES" ]; then
-  while IFS=$'\t' read -r name session; do
-    [ -z "$name" ] && continue
-    current=$(check_session_state "$session")
-    prev=""
-    [ -f "$STATE_DIR/$name.state" ] && prev=$(cat "$STATE_DIR/$name.state")
-
-    if [ "$current" != "$prev" ]; then
-      # Write new state atomically
-      echo "$current" > "$STATE_DIR/$name.state.tmp"
-      mv "$STATE_DIR/$name.state.tmp" "$STATE_DIR/$name.state"
-
-      # Format state change
-      case "$current" in
-        idle)    OUTPUT="$OUTPUT
-  $name: now idle (was ${prev:-unknown})" ;;
-        working) ;; # don't report working transitions — too noisy
-        blocked) OUTPUT="$OUTPUT
-  $name: NEEDS INPUT (blocked on a prompt)" ;;
-        picker)  OUTPUT="$OUTPUT
-  $name: NEEDS SELECTION (picker visible — use fleet pick)" ;;
-        exited)  OUTPUT="$OUTPUT
-  $name: session exited" ;;
-        crashed) OUTPUT="$OUTPUT
-  $name: session CRASHED" ;;
-        gone)    OUTPUT="$OUTPUT
-  $name: session gone (tmux session missing)" ;;
-      esac
-    fi
-  done <<< "$FEATURES"
-fi
-
-# --- Output ---
-
-OUTPUT=$(echo "$OUTPUT" | sed '/^$/d')
-[ -z "$OUTPUT" ] && exit 0
-
-COUNT=$(echo "$OUTPUT" | wc -l | tr -d ' ')
+COUNT=$(echo "$FORMATTED" | wc -l | tr -d ' ')
 echo ""
 echo "--- Fleet Events ($COUNT new) ---"
-echo "$OUTPUT"
+echo "$FORMATTED"
 echo "--- End Fleet Events ---"
 echo ""
-
-exit 0
