@@ -3,11 +3,11 @@ function tclaude --description "Claude Code workspace with dev layout"
     or return 1
 
     if set -q _flag_orchestrator
-        set -l session_name fleet-orchestrator
+        set -l session_name fleet-captain
 
         if not tmux has-session -t $session_name 2>/dev/null
             tmux new-session -d -s $session_name -n "claude" -c $HOME
-            tmux set-option -t $session_name @fleet_orchestrator 1
+            tmux set-option -t $session_name @fleet_captain 1
         end
         _tclaude_ensure_claude $session_name
         _tclaude_attach $session_name

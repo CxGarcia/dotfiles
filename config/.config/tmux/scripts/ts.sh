@@ -22,19 +22,19 @@ COLORS="bg+:#2d3843,fg:#908caa,fg+:#e0def4,hl:#ebbcba,hl+:#ebbcba"
 COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#ebbcba"
 
 list_sessions() {
-    # Orchestrator first in output = bottom in fzf --layout=reverse
+    # Captain first in output = bottom in fzf --layout=reverse
     tmux list-sessions -F '#{session_id} #{session_name}' 2>/dev/null | while read -r id name; do
         [[ "$name" == "$CURRENT_SESSION" ]] && continue
-        [[ "$(tmux show-option -qv -t "$name" @fleet_orchestrator 2>/dev/null)" != "1" ]] && continue
-        task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null)
-        [[ -z "$task" ]] && task="Fleet Orchestrator"
+        [[ "$(tmux show-option -qv -t "$name" @fleet_captain 2>/dev/null)" != "1" ]] && continue
+        task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null | head -1)
+        [[ -z "$task" ]] && task="Fleet Captain"
         printf '%s\t%s\t⚡ %s\t%s\n' "$id" "$name" "$task" "fleet"
     done
     tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' |
         sort -rn | while read -r _ id name; do
             [[ "$name" == "$CURRENT_SESSION" || "$name" == _picker_* ]] && continue
-            [[ "$(tmux show-option -qv -t "$name" @fleet_orchestrator 2>/dev/null)" == "1" ]] && continue
-            task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null)
+            [[ "$(tmux show-option -qv -t "$name" @fleet_captain 2>/dev/null)" == "1" ]] && continue
+            task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null | head -1)
             repo=$(basename "$(tmux display-message -t "$id:=claude" -p '#{pane_current_path}' 2>/dev/null)" 2>/dev/null)
             [[ -z "$task" ]] && task="$name"
             printf '%s\t%s\t%s\t%s\n' "$id" "$name" "$task" "$repo"

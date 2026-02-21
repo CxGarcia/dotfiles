@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# fleet-hook — Log discrete events from fleet feature sessions
+# Only logs actionable events (PR created, pushed, context warning).
+# State detection (idle/working/blocked) is handled by fleet-inject via tmux.
+
+INPUT=$(cat)
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // empty')
+
+# Only process fleet sessions (worktree CWD)
+echo "$CWD" | grep -q '\.claude/worktrees/' || exit 0
+
+FEATURE=$(echo "$CWD" | sed 's|.*\.claude/worktrees/||' | cut -d/ -f1)
+[ -z "$FEATURE" ] && exit 0
+
+EVENTS_FILE="$HOME/.claude/fleet/events.jsonl"
+TS=$(date -u +%FT%TZ)
+
+case "$EVENT" in
+  PreCompact)
+    echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"context_warning\"}" >> "$EVENTS_FILE"
+    ;;
+  PostToolUse)
+    TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
+    [ "$TOOL" != "Bash" ] && exit 0
+
+    COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+    RESPONSE=$(echo "$INPUT" | jq -r '.tool_response // empty')
+
+    if echo "$COMMAND" | grep -q 'gh pr create'; then
+      PR_URL=$(echo "$RESPONSE" | grep -oE 'https://github\.com/[^ ]+/pull/[0-9]+' | head -1)
+      [ -n "$PR_URL" ] && echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"pr_created\",\"url\":\"$PR_URL\"}" >> "$EVENTS_FILE"
+    elif echo "$COMMAND" | grep -q 'git push'; then
+      BRANCH=$(echo "$COMMAND" | grep -oE '[-a-zA-Z0-9_/]+$')
+      echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"pushed\",\"branch\":\"$BRANCH\"}" >> "$EVENTS_FILE"
+    fi
+    ;;
+esac
+
+exit 0
