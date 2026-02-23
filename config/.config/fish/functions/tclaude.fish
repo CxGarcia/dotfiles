@@ -6,8 +6,12 @@ function tclaude --description "Claude Code workspace with dev layout"
         set -l session_name fleet-captain
 
         if not tmux has-session -t $session_name 2>/dev/null
-            tmux new-session -d -s $session_name -n "claude" -c $HOME
+            tmux new-session -d -s $session_name -n "claude" -c $PWD
             tmux set-option -t $session_name @fleet_captain 1
+            tmux new-window -d -t $session_name:2 -n util -c $PWD
+            tmux split-window -d -v -t "$session_name:2" -c $PWD
+            tmux set-option -w -t "$session_name:2" monitor-activity off
+            tmux select-window -t "$session_name:1"
         end
         _tclaude_ensure_claude $session_name
         _tclaude_attach $session_name

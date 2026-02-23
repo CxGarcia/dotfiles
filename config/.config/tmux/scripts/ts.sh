@@ -21,24 +21,48 @@ go_to_session() {
 COLORS="bg+:#2d3843,fg:#908caa,fg+:#e0def4,hl:#ebbcba,hl+:#ebbcba"
 COLORS+=",border:#3a4450,header:#f6c177,pointer:#ebbcba,marker:#f6c177,prompt:#ebbcba"
 
+session_dot() {
+    local target="$1" color symbol="●"
+    local cmd; cmd=$(tmux display-message -t "$target" -p '#{pane_current_command}' 2>/dev/null)
+    if [[ "$cmd" != "claude" ]]; then
+        color="31"
+    else
+        local content; content=$(tmux capture-pane -t "$target:claude" -p -S -10 2>/dev/null)
+        if [[ "$content" =~ \[y/n\]|\[Y/n\]|\[yes/no\]|(↑/↓|↑↓).*select|to\ select.*Enter|Space\ to\ select ]]; then
+            color="33"
+        elif [[ "$content" =~ ctrl\+c\ to\ interrupt|·.*tokens ]]; then
+            color="38;5;39"
+        elif [[ "$content" == *❯* ]]; then
+            color="90"
+        else
+            color="90"; symbol="○"
+        fi
+    fi
+    printf '\033[%sm%s\033[0m' "$color" "$symbol"
+}
+
 list_sessions() {
-    # Captain first in output = bottom in fzf --layout=reverse
-    tmux list-sessions -F '#{session_id} #{session_name}' 2>/dev/null | while read -r id name; do
-        [[ "$name" == "$CURRENT_SESSION" ]] && continue
-        [[ "$(tmux show-option -qv -t "$name" @fleet_captain 2>/dev/null)" != "1" ]] && continue
-        task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null | head -1)
-        [[ -z "$task" ]] && task="Fleet Captain"
-        printf '%s\t%s\t⚡ %s\t%s\n' "$id" "$name" "$task" "fleet"
-    done
-    tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' |
-        sort -rn | while read -r _ id name; do
-            [[ "$name" == "$CURRENT_SESSION" || "$name" == _picker_* ]] && continue
-            [[ "$(tmux show-option -qv -t "$name" @fleet_captain 2>/dev/null)" == "1" ]] && continue
-            task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null | head -1)
-            repo=$(basename "$(tmux display-message -t "$id:=claude" -p '#{pane_current_path}' 2>/dev/null)" 2>/dev/null)
-            [[ -z "$task" ]] && task="$name"
-            printf '%s\t%s\t%s\t%s\n' "$id" "$name" "$task" "$repo"
-        done
+    local captains="" sessions="" line
+    while read -r _ id name; do
+        [[ "$name" == "$CURRENT_SESSION" || "$name" == _picker_* ]] && continue
+        local captain; captain=$(tmux show-option -qv -t "$name" @fleet_captain 2>/dev/null)
+        local task; task=$(tmux show-option -qv -t "$name" @claude_task 2>/dev/null | head -1)
+        if [[ "$captain" == "1" ]]; then
+            printf -v line '%s\t%s\t⚡ %s\t%s\n' "$id" "$name" "${task:-Fleet Captain}" "fleet"
+            captains+="$line"
+            continue
+        fi
+        local repo; repo=$(basename "$(tmux display-message -t "$id:=claude" -p '#{pane_current_path}' 2>/dev/null)" 2>/dev/null)
+        local managed; managed=$(tmux show-option -qv -t "$name" @fleet_managed 2>/dev/null)
+        if [[ "$managed" == "1" ]]; then
+            local dot; dot=$(session_dot "$id")
+            printf -v line '%s\t%s\t%s %s\t%s\n' "$id" "$name" "$dot" "${task:-$name}" "$repo"
+        else
+            printf -v line '%s\t%s\t%s\t%s\n' "$id" "$name" "${task:-$name}" "$repo"
+        fi
+        sessions+="$line"
+    done < <(tmux list-sessions -F '#{session_activity} #{session_id} #{session_name}' 2>/dev/null | sort -rn)
+    printf '%s' "$captains$sessions"
 }
 
 case "${1:-}" in
@@ -61,7 +85,7 @@ if [[ "${1:-}" == "--windows" ]]; then
             --preview-window=right:55%:border-left \
             --color="$COLORS" --no-border --no-sort --no-separator --header=" " --layout=reverse --padding=0,3
     ) || exit 0
-    target_win="$(echo "$selected" | cut -d' ' -f1)"
+    target_win="${selected%% *}"
     go_to_session "$target_win" "$target_win"
     exit 0
 fi
@@ -76,19 +100,25 @@ selected=$(
         --pointer="" \
         --delimiter='\t' \
         --with-nth=3 \
-        --nth=.. \
         --bind="ctrl-x:execute-silent($SELF --kill {1} $CURRENT_SESSION_ID)+reload($SELF --list)" \
         --bind="ctrl-f:reload($SELF --list-dirs)+change-preview($PREVIEW_DIR)" \
         --bind="ctrl-s:reload($SELF --list)+change-preview($PREVIEW_SESSION)" \
         --preview="$PREVIEW_SESSION" \
         --preview-window=right:55%:border-left \
-        --color="$COLORS" --no-border --no-sort --no-separator --header=" " --info=inline-right --padding=0,3
+        --ansi --color="$COLORS" --no-border --no-sort --no-separator --header=" " --info=inline-right --padding=0,3
 ) || exit 0
 
-query=$(echo "$selected" | sed -n '1p')
-choice=$(echo "$selected" | sed -n '2p')
-target=$([[ -n "$choice" ]] && echo "$choice" | cut -f1 || echo "")
-name=$([[ -n "$choice" ]] && echo "$choice" | cut -f2 || echo "$query")
+{
+    IFS= read -r query
+    IFS= read -r choice
+} <<< "$selected"
+
+if [[ -n "$choice" ]]; then
+    IFS=$'\t' read -r target name _ <<< "$choice"
+else
+    target=""
+    name="$query"
+fi
 [[ -z "$target" && -z "$name" ]] && exit 0
 
 # Existing session -- switch using stable session ID
@@ -104,7 +134,8 @@ else
     work_dir=$(zoxide query "$name" 2>/dev/null || echo "$HOME")
 fi
 
-base_name="$(basename "$work_dir" | tr '.' '_')"
+base_name="${work_dir##*/}"
+base_name="${base_name//./_}"
 session_name="$base_name"
 n=2
 while tmux has-session -t="$session_name" 2>/dev/null; do
@@ -112,7 +143,7 @@ while tmux has-session -t="$session_name" 2>/dev/null; do
     n=$((n + 1))
 done
 tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
-tmux set-option -t "$session_name" @claude_task "$(basename "$work_dir")"
+tmux set-option -t "$session_name" @claude_task "${work_dir##*/}"
 tmux send-keys -t "$session_name:=claude" "claude --dangerously-skip-permissions" C-m
 zoxide add "$work_dir" 2>/dev/null
 go_to_session "$session_name:=claude" "$session_name"

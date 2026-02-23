@@ -40,8 +40,9 @@ tmux send-keys -t "=$session_name" -l "command"
 
 | Option | Purpose | Values |
 |--------|---------|--------|
-| `@fleet_managed` | Marks session as orchestrator-managed | `1` |
-| `@fleet_phase` | Current pipeline phase | `brainstorm`, `plan`, etc. |
+| `@fleet_managed` | Marks session as fleet-managed | `1` |
+| `@fleet_captain` | Marks session as the captain | `1` |
+| `@claude_task` | Task description (shown in picker) | Free text |
 
 ```bash
 tmux show-option -qv -t "$session" @fleet_managed   # read

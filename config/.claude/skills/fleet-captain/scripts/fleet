@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander"
 import { $ } from "bun"
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, readdirSync, rmSync } from "fs"
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, renameSync, readdirSync, rmSync } from "fs"
 import { join, basename, resolve } from "path"
 import { homedir } from "os"
 
@@ -9,10 +9,10 @@ const FMT_CMD = "#{pane_current_command}"
 const FMT_DEAD = "#{pane_dead}"
 const FMT_DEAD_STATUS = "#{pane_dead_status}"
 const FMT_SESSION_ID = "#{session_id}"
-const FMT_PANE_TITLE = "#{pane_title}"
 const FMT_SESSIONS = "#{session_id} #{session_name}"
 
-const FLEET_DIR = join(homedir(), ".claude", "fleet")
+const HOME = homedir()
+const FLEET_DIR = join(HOME, ".claude", "fleet")
 const REGISTRY = join(FLEET_DIR, "registry.json")
 const EVENTS = join(FLEET_DIR, "events.jsonl")
 const REPOS = join(FLEET_DIR, "repos.json")
@@ -31,7 +31,6 @@ function readRegistry(): Registry {
 function writeRegistry(reg: Registry) {
   const tmp = `${REGISTRY}.tmp`
   writeFileSync(tmp, JSON.stringify(reg, null, 2))
-  const { renameSync } = require("fs")
   renameSync(tmp, REGISTRY)
 }
 
@@ -70,7 +69,7 @@ function writeRepos(repos: Record<string, string>) {
 }
 
 function resolveRepo(input: string): string | null {
-  const expanded = input.replace(/^~/, homedir())
+  const expanded = input.replace(/^~/, HOME)
   if (existsSync(expanded)) return resolve(expanded)
 
   const repos = readRepos()
@@ -80,6 +79,10 @@ function resolveRepo(input: string): string | null {
   if (fuzzy && existsSync(fuzzy[1])) return fuzzy[1]
 
   return null
+}
+
+async function tmuxGet(target: string, fmt: string): Promise<string> {
+  return (await $`tmux display-message -t ${target} -p ${fmt}`.quiet().nothrow()).text().trim()
 }
 
 async function tmuxSend(session: string, text: string) {
@@ -96,7 +99,7 @@ async function sessionExists(target: string): Promise<boolean> {
 async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
   const target = `${session}:claude`
   for (let elapsed = 0; elapsed < maxWait; elapsed += 2) {
-    const cmd = (await $`tmux display-message -t ${target} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
+    const cmd = await tmuxGet(target, FMT_CMD)
     if (cmd === "claude") {
       const content = (await $`tmux capture-pane -t ${target} -p -S -5`.quiet().nothrow()).text()
       const hasPrompt = content.includes("❯")
@@ -114,12 +117,12 @@ async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
 async function checkSessionState(target: string): Promise<string> {
   if (!await sessionExists(target)) return "gone"
 
-  const cmd = (await $`tmux display-message -t ${target} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
+  const cmd = await tmuxGet(target, FMT_CMD)
 
   if (cmd !== "claude") {
-    const dead = (await $`tmux display-message -t ${target} -p ${FMT_DEAD}`.quiet().nothrow()).text().trim()
+    const dead = await tmuxGet(target, FMT_DEAD)
     if (dead === "1") {
-      const code = (await $`tmux display-message -t ${target} -p ${FMT_DEAD_STATUS}`.quiet().nothrow()).text().trim()
+      const code = await tmuxGet(target, FMT_DEAD_STATUS)
       return code === "0" ? "exited" : `crashed:${code}`
     }
     return "exited"
@@ -138,18 +141,14 @@ async function checkSessionState(target: string): Promise<string> {
 interface Feature {
   description: string
   repo: string
-  worktreePath: string
-  branch: string
+  worktreePath: string | null
+  branch: string | null
   tmuxSession: string
   tmuxSessionId: string
-  phase: string
-  phaseHistory: string[]
-  mode: string
   pr: { number: number; url?: string; ciStatus: string; lastChecked: string } | null
   status: string
   startedAt: string
   updatedAt: string
-  artifacts: Record<string, string>
 }
 
 interface Registry {
@@ -163,18 +162,18 @@ const fleet = new Command("fleet")
   .version("1.0.0")
 
 fleet.command("spawn")
-  .description("Create a new feature session with its own worktree")
+  .description("Create a new feature session")
   .argument("<name>", "Feature name (kebab-case)")
   .argument("<repo>", "Repository path or shortname from repos index")
-  .argument("[description]", "Feature description")
-  .option("--mode <mode>", "Pipeline mode: phased, slfg, or fix", "phased")
+  .argument("[description]", "Prompt to send to the session")
+  .option("--worktree", "Create a git worktree for isolation")
+  .option("--branch <branch>", "Check out an existing branch")
   .action(async (name, repoInput, description, opts) => {
-    const resolved = resolveRepo(repoInput)
-    if (!resolved) {
+    const repo = resolveRepo(repoInput)
+    if (!repo) {
       console.error(`ERROR: '${repoInput}' is not a directory and not in repos index. Run 'fleet repos list' to see known repos.`)
       process.exit(1)
     }
-    const repo = resolve(resolved)
 
     const isGit = await $`git -C ${repo} rev-parse --git-dir`.quiet().nothrow()
     if (isGit.exitCode !== 0) {
@@ -198,32 +197,38 @@ fleet.command("spawn")
       sessionName = `${name}-${n++}`
     }
 
-    const worktreePath = join(repo, ".claude", "worktrees", name)
-    const branch = `worktree-${name}`
+    let workDir = repo
+    let worktreePath: string | null = null
+    let branch: string | null = opts.branch ?? null
 
-    if (existsSync(worktreePath)) {
-      console.log(`WORKTREE_EXISTS: ${worktreePath}`)
-    } else {
-      let defaultBranch = (await $`git -C ${repo} symbolic-ref refs/remotes/origin/HEAD`.quiet().nothrow()).text().trim().replace("refs/remotes/origin/", "")
-      if (!defaultBranch) defaultBranch = "main"
-      await $`git -C ${repo} fetch origin ${defaultBranch} --quiet`.quiet().nothrow()
-      mkdirSync(join(repo, ".claude", "worktrees"), { recursive: true })
-      const wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${defaultBranch}`.nothrow()
-      console.log(wt.text())
-      console.log(`WORKTREE_CREATED: ${worktreePath} (branch: ${branch})`)
+    if (opts.worktree) {
+      worktreePath = join(repo, ".claude", "worktrees", name)
+      branch = branch ?? `worktree-${name}`
+
+      if (existsSync(worktreePath)) {
+        console.log(`WORKTREE_EXISTS: ${worktreePath}`)
+      } else {
+        let defaultBranch = (await $`git -C ${repo} symbolic-ref refs/remotes/origin/HEAD`.quiet().nothrow()).text().trim().replace("refs/remotes/origin/", "")
+        if (!defaultBranch) defaultBranch = "main"
+        await $`git -C ${repo} fetch origin ${defaultBranch} --quiet`.quiet().nothrow()
+        mkdirSync(join(repo, ".claude", "worktrees"), { recursive: true })
+        const wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${defaultBranch}`.nothrow()
+        console.log(wt.text())
+        console.log(`WORKTREE_CREATED: ${worktreePath} (branch: ${branch})`)
+      }
+      workDir = worktreePath
     }
 
-    await $`tmux new-session -d -s ${sessionName} -n claude -c ${worktreePath}`.quiet()
+    await $`tmux new-session -d -s ${sessionName} -n claude -c ${workDir}`.quiet()
     await $`tmux set-option -t ${sessionName} @fleet_managed 1`.quiet()
     if (description) await $`tmux set-option -t ${sessionName} @claude_task ${description}`.quiet()
 
-    // Create util window at index 2 in the base repo (not the worktree)
     await $`tmux new-window -d -t ${sessionName}:2 -n util -c ${repo}`.quiet().nothrow()
     await $`tmux split-window -d -v -t ${sessionName}:2 -c ${repo}`.quiet().nothrow()
     await $`tmux set-option -w -t ${sessionName}:2 monitor-activity off`.quiet().nothrow()
     await $`tmux select-window -t ${sessionName}:1`.quiet().nothrow()
 
-    const sessionId = (await $`tmux display-message -t ${sessionName} -p ${FMT_SESSION_ID}`.quiet()).text().trim()
+    const sessionId = await tmuxGet(sessionName, FMT_SESSION_ID)
     console.log(`SESSION_CREATED: ${sessionName} (id: ${sessionId})`)
 
     await tmuxSend(sessionName, "claude --dangerously-skip-permissions")
@@ -236,17 +241,10 @@ fleet.command("spawn")
     }
     console.log("CLAUDE_READY")
 
-    let initialCmd: string
-    switch (opts.mode) {
-      case "slfg": initialCmd = `/slfg ${description ?? ""}`; break
-      case "fix": initialCmd = description ?? ""; break
-      default: initialCmd = `/workflows:brainstorm ${description ?? ""}`; break
+    if (description) {
+      await tmuxSend(sessionName, description)
+      console.log(`PROMPT_SENT: ${description}`)
     }
-
-    await tmuxSend(sessionName, initialCmd)
-    console.log(`COMMAND_SENT: ${initialCmd}`)
-
-    const phase = opts.mode === "slfg" ? "slfg" : opts.mode === "fix" ? "fix" : "brainstorm"
 
     const reg = readRegistry()
     reg.features[name] = {
@@ -256,19 +254,15 @@ fleet.command("spawn")
       branch,
       tmuxSession: sessionName,
       tmuxSessionId: sessionId,
-      phase,
-      phaseHistory: ["spawned"],
-      mode: opts.mode,
       pr: null,
       status: "active",
       startedAt: ts(),
       updatedAt: ts(),
-      artifacts: {},
     }
     reg.updated = ts()
     writeRegistry(reg)
-    logEvent(name, "spawned", { phase })
-    console.log(`REGISTERED: ${name} (${opts.mode} mode, phase: ${phase})`)
+    logEvent(name, "spawned")
+    console.log(`REGISTERED: ${name}`)
   })
 
 fleet.command("status")
@@ -287,7 +281,7 @@ fleet.command("status")
       const repoName = basename(feat.repo)
 
       console.log(`--- ${name} ---`)
-      console.log(`phase=${feat.phase} live=${liveState} repo=${repoName}`)
+      console.log(`live=${liveState} repo=${repoName}`)
 
       if (feat.pr) {
         const prUrl = feat.pr.url ?? (await $`gh pr view ${feat.pr.number} --repo ${feat.repo} --json url -q .url`.quiet().nothrow()).text().trim()
@@ -305,31 +299,26 @@ fleet.command("status")
       console.log("")
     }
 
-    // Drain pending events
     const offsetFile = join(FLEET_DIR, ".events_offset")
-    if (existsSync(EVENTS)) {
-      const currentSize = Buffer.byteLength(readFileSync(EVENTS))
-      let lastOffset = 0
-      if (existsSync(offsetFile)) lastOffset = parseInt(readFileSync(offsetFile, "utf-8")) || 0
+    const eventsContent = readFileSync(EVENTS, "utf-8")
+    const currentSize = Buffer.byteLength(eventsContent)
+    const lastOffset = existsSync(offsetFile) ? parseInt(readFileSync(offsetFile, "utf-8")) || 0 : 0
 
-      if (currentSize > lastOffset) {
-        const content = readFileSync(EVENTS, "utf-8")
-        const newBytes = Buffer.from(content).subarray(lastOffset)
-        const newLines = newBytes.toString().split("\n").filter(Boolean)
-        writeFileSync(offsetFile, String(currentSize))
+    if (currentSize > lastOffset) {
+      const newLines = Buffer.from(eventsContent).subarray(lastOffset).toString().split("\n").filter(Boolean)
+      writeFileSync(offsetFile, String(currentSize))
 
-        if (newLines.length > 0) {
-          console.log("--- events ---")
-          for (const line of newLines) {
-            try {
-              const e = JSON.parse(line)
-              console.log(`  ${e.feature}: ${e.event}${e.url ? " " + e.url : ""}${e.branch ? " " + e.branch : ""}`)
-            } catch {
-              console.log(`  ${line}`)
-            }
+      if (newLines.length > 0) {
+        console.log("--- events ---")
+        for (const line of newLines) {
+          try {
+            const e = JSON.parse(line)
+            console.log(`  ${e.feature}: ${e.event}${e.url ? " " + e.url : ""}${e.branch ? " " + e.branch : ""}`)
+          } catch {
+            console.log(`  ${line}`)
           }
-          console.log("")
         }
+        console.log("")
       }
     }
   })
@@ -340,7 +329,7 @@ fleet.command("check")
   .action(async (name) => {
     const feat = requireFeature(name)
     const state = await checkSessionState(feat.tmuxSession)
-    console.log(`FEATURE=${name} PHASE=${feat.phase} STATE=${state}`)
+    console.log(`FEATURE=${name} STATE=${state}`)
 
     if (["idle", "working", "blocked", "picker"].includes(state)) {
       console.log("PANE_OUTPUT:")
@@ -360,8 +349,9 @@ fleet.command("send")
       console.error(`ERROR: Session is ${state}. Cannot send command.`)
       process.exit(1)
     }
-    await tmuxSend(feat.tmuxSession, command.join(" "))
-    console.log(`SENT (state was ${state}): ${command.join(" ")}`)
+    const text = command.join(" ")
+    await tmuxSend(feat.tmuxSession, text)
+    console.log(`SENT (state was ${state}): ${text}`)
   })
 
 fleet.command("pick")
@@ -394,55 +384,6 @@ fleet.command("keys")
     console.log(`KEYS_SENT: ${keys.join(" ")}`)
   })
 
-fleet.command("advance")
-  .description("Advance a feature to the next pipeline phase")
-  .argument("<name>", "Feature name")
-  .action(async (name) => {
-    const feat = requireFeature(name)
-
-    if (feat.mode === "slfg") {
-      console.error(`ERROR: Feature '${name}' is in slfg mode — it advances autonomously`)
-      process.exit(1)
-    }
-
-    const state = await checkSessionState(feat.tmuxSession)
-    if (state !== "idle") {
-      console.error(`ERROR: Session is not idle (state: ${state}). Wait for current phase to complete.`)
-      process.exit(1)
-    }
-
-    const transitions: Record<string, [string, string]> = {
-      brainstorm: ["plan", "/workflows:plan"],
-      plan: ["work", "/workflows:work"],
-      work: ["review", "/workflows:review latest"],
-      review: ["simplify", "Run the code-simplifier agent on changes in this branch. Iterate until nothing left to simplify."],
-      simplify: ["pr_monitoring", ""],
-    }
-
-    const transition = transitions[feat.phase]
-    if (!transition) {
-      console.error(`ERROR: Cannot advance from phase '${feat.phase}'`)
-      process.exit(1)
-    }
-
-    const [nextPhase, nextCmd] = transition
-    if (nextCmd) {
-      await tmuxSend(feat.tmuxSession, nextCmd)
-      console.log(`SENT: ${nextCmd}`)
-    }
-
-    const reg = readRegistry()
-    reg.features[name].phase = nextPhase
-    reg.features[name].phaseHistory.push(feat.phase)
-    reg.features[name].updatedAt = ts()
-    reg.updated = ts()
-    writeRegistry(reg)
-
-    logEvent(name, "phase_complete", { phase: feat.phase })
-    logEvent(name, "phase_start", { phase: nextPhase })
-    console.log(`ADVANCED: ${name} ${feat.phase} -> ${nextPhase}`)
-  })
-
 fleet.command("kill")
   .description("Clean up a feature session: session, worktree, branch")
   .argument("<name>", "Feature name")
@@ -450,7 +391,9 @@ fleet.command("kill")
     const feat = requireFeature(name)
     const { tmuxSessionId: sid, tmuxSession: sname, repo, worktreePath, branch } = feat
 
-    const target = await sessionExists(sid) ? sid : await sessionExists(sname) ? sname : null
+    let target: string | null = null
+    if (await sessionExists(sid)) target = sid
+    else if (await sessionExists(sname)) target = sname
     if (target) {
       await $`tmux send-keys -t ${target} C-c`.quiet().nothrow()
       await Bun.sleep(1000)
@@ -463,20 +406,21 @@ fleet.command("kill")
       console.log(`SESSION_ALREADY_GONE: ${sname}`)
     }
 
-    if (existsSync(worktreePath)) {
+    if (worktreePath && existsSync(worktreePath)) {
       await $`git -C ${repo} worktree remove --force ${worktreePath}`.quiet().nothrow()
       console.log(`WORKTREE_REMOVED: ${worktreePath}`)
     }
 
-    const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
-    if (branchExists.exitCode === 0) {
-      await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
-      console.log(`BRANCH_DELETED: ${branch}`)
+    if (branch) {
+      const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
+      if (branchExists.exitCode === 0) {
+        await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
+        console.log(`BRANCH_DELETED: ${branch}`)
+      }
     }
 
-    const home = homedir()
     for (const prefix of ["teams", "tasks"]) {
-      const dir = join(home, ".claude", prefix)
+      const dir = join(HOME, ".claude", prefix)
       if (existsSync(dir)) {
         for (const entry of readdirSync(dir)) {
           if (entry.startsWith("work-")) rmSync(join(dir, entry), { recursive: true, force: true })
@@ -499,7 +443,7 @@ fleet.command("list")
       const [id, sname] = line.split(" ")
       const managed = (await $`tmux show-option -qv -t ${sname} @fleet_managed`.quiet().nothrow()).text().trim()
       if (managed === "1") {
-        const cmd = (await $`tmux display-message -t ${sname} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
+        const cmd = await tmuxGet(sname, FMT_CMD)
         console.log(`ID=${id} NAME=${sname} CMD=${cmd}`)
       }
     }
@@ -519,25 +463,20 @@ fleet.command("recover")
     console.log("RECOVERING:")
     for (const [name, feat] of active) {
       const sessionAlive = await sessionExists(feat.tmuxSessionId)
-      let claudeRunning = false
-      if (sessionAlive) {
-        const cmd = (await $`tmux display-message -t ${feat.tmuxSessionId} -p ${FMT_CMD}`.quiet().nothrow()).text().trim()
-        claudeRunning = cmd === "claude"
-      }
-      const worktreeExists = existsSync(feat.worktreePath)
+      const claudeRunning = sessionAlive && (await tmuxGet(feat.tmuxSessionId, FMT_CMD)) === "claude"
+      const worktreeExists = feat.worktreePath ? existsSync(feat.worktreePath) : false
 
       let prStatus = "none"
-      const prJson = (await $`gh pr list --repo ${feat.repo} --head ${feat.branch} --json number,state --limit 1`.quiet().nothrow()).text().trim()
-      try {
-        const prs = JSON.parse(prJson || "[]")
-        if (prs.length > 0) prStatus = `PR #${prs[0].number} (${prs[0].state})`
-      } catch {}
-
-      let recoverStatus = "ok"
-      if (!sessionAlive) {
-        updateFeature(name, { status: "crashed" })
-        recoverStatus = "crashed"
+      if (feat.branch) {
+        const prJson = (await $`gh pr list --repo ${feat.repo} --head ${feat.branch} --json number,state --limit 1`.quiet().nothrow()).text().trim()
+        try {
+          const prs = JSON.parse(prJson || "[]")
+          if (prs.length > 0) prStatus = `PR #${prs[0].number} (${prs[0].state})`
+        } catch {}
       }
+
+      const recoverStatus = sessionAlive ? "ok" : "crashed"
+      if (!sessionAlive) updateFeature(name, { status: "crashed" })
 
       console.log(`NAME=${name} SESSION=${sessionAlive ? "yes" : "no"} CLAUDE=${claudeRunning ? "yes" : "no"} WORKTREE=${worktreeExists ? "yes" : "no"} PR=${prStatus} STATUS=${recoverStatus}`)
     }
@@ -551,11 +490,12 @@ fleet.command("prune")
     if (!existsSync(EVENTS)) { console.log("No events file"); return }
     const lines = readFileSync(EVENTS, "utf-8").split("\n").filter(Boolean)
     const before = lines.length
-    const pruned = lines.slice(-keep)
-    writeFileSync(EVENTS, pruned.join("\n") + "\n")
-    const newSize = Buffer.byteLength(pruned.join("\n") + "\n")
+    const kept = lines.slice(-keep)
+    const content = kept.join("\n") + "\n"
+    writeFileSync(EVENTS, content)
+    const newSize = Buffer.byteLength(content)
     writeFileSync(join(FLEET_DIR, ".events_offset"), String(newSize))
-    console.log(`PRUNED: ${before} -> ${pruned.length} events (offset reset to ${newSize})`)
+    console.log(`PRUNED: ${before} -> ${kept.length} events (offset reset to ${newSize})`)
   })
 
 fleet.command("desc")

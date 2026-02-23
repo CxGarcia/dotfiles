@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# fleet-inject — Inject discrete fleet events into captain context
-# Runs on UserPromptSubmit. Reads new events from events.jsonl.
 
 FLEET_DIR="$HOME/.claude/fleet"
 EVENTS_FILE="$FLEET_DIR/events.jsonl"
 OFFSET_FILE="$FLEET_DIR/.events_offset"
-REGISTRY="$FLEET_DIR/registry.json"
 
-[ -f "$REGISTRY" ] || exit 0
 [ -f "$EVENTS_FILE" ] || exit 0
 
 CURRENT_SIZE=$(wc -c < "$EVENTS_FILE" | tr -d ' ')
@@ -21,21 +17,21 @@ echo "$CURRENT_SIZE" > "$OFFSET_FILE"
 
 [ -n "$NEW_EVENTS" ] || exit 0
 
-DEDUPED=$(echo "$NEW_EVENTS" | jq -s 'group_by(.feature + ":" + .event) | map(last) | sort_by(.ts)' 2>/dev/null)
-[ -n "$DEDUPED" ] && [ "$DEDUPED" != "[]" ] || exit 0
-
-FORMATTED=$(echo "$DEDUPED" | jq -r '.[] |
-  if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
-  elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
-  elif .event == "context_warning" then "  \(.feature): context compacting — may lose coherence"
-  else "  \(.feature): \(.event)"
-  end' 2>/dev/null)
+FORMATTED=$(echo "$NEW_EVENTS" | jq -rs '
+  group_by(.feature + ":" + .event) | map(last) | sort_by(.ts) |
+  if length == 0 then halt_error(1) else . end |
+  "--- Fleet Events (\(length) new) ---\n" +
+  (map(
+    if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
+    elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
+    elif .event == "context_warning" then "  \(.feature): context compacting — may lose coherence"
+    else "  \(.feature): \(.event)"
+    end
+  ) | join("\n")) +
+  "\n--- End Fleet Events ---"' 2>/dev/null)
 
 [ -n "$FORMATTED" ] || exit 0
 
-COUNT=$(echo "$FORMATTED" | wc -l | tr -d ' ')
 echo ""
-echo "--- Fleet Events ($COUNT new) ---"
 echo "$FORMATTED"
-echo "--- End Fleet Events ---"
 echo ""
