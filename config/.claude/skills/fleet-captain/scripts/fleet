@@ -168,6 +168,7 @@ fleet.command("spawn")
   .argument("<repo>", "Repository path or shortname from repos index")
   .argument("[description]", "Feature description")
   .option("--mode <mode>", "Pipeline mode: phased, slfg, or fix", "phased")
+  .option("--base <branch>", "Base branch for the worktree (default: repo default branch)")
   .action(async (name, repoInput, description, opts) => {
     const resolved = resolveRepo(repoInput)
     if (!resolved) {
@@ -204,11 +205,14 @@ fleet.command("spawn")
     if (existsSync(worktreePath)) {
       console.log(`WORKTREE_EXISTS: ${worktreePath}`)
     } else {
-      let defaultBranch = (await $`git -C ${repo} symbolic-ref refs/remotes/origin/HEAD`.quiet().nothrow()).text().trim().replace("refs/remotes/origin/", "")
-      if (!defaultBranch) defaultBranch = "main"
-      await $`git -C ${repo} fetch origin ${defaultBranch} --quiet`.quiet().nothrow()
+      let baseBranch = opts.base
+      if (!baseBranch) {
+        baseBranch = (await $`git -C ${repo} symbolic-ref refs/remotes/origin/HEAD`.quiet().nothrow()).text().trim().replace("refs/remotes/origin/", "")
+        if (!baseBranch) baseBranch = "main"
+      }
+      await $`git -C ${repo} fetch origin ${baseBranch} --quiet`.quiet().nothrow()
       mkdirSync(join(repo, ".claude", "worktrees"), { recursive: true })
-      const wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${defaultBranch}`.nothrow()
+      const wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${baseBranch}`.nothrow()
       console.log(wt.text())
       console.log(`WORKTREE_CREATED: ${worktreePath} (branch: ${branch})`)
     }
