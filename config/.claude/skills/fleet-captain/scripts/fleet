@@ -132,7 +132,7 @@ async function checkSessionState(target: string): Promise<string> {
   const title = await tmuxGet(target, "#{pane_title}")
 
   if (title.startsWith("✳")) {
-    const content = (await $`tmux capture-pane -t ${target} -p -S -10`.quiet().nothrow()).text()
+    const content = (await $`tmux capture-pane -t ${target} -p`.quiet().nothrow()).text().split("\n").slice(-3).join("\n")
     if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(content)) return "blocked"
     if (/Enter to select|Space to select/.test(content)) return "picker"
     return "idle"

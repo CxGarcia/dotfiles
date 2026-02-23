@@ -29,7 +29,7 @@ session_dot() {
     else
         local title; title=$(tmux display-message -t "$target:claude" -p '#{pane_title}' 2>/dev/null)
         if [[ "$title" == ✳* ]]; then
-            local content; content=$(tmux capture-pane -t "$target:claude" -p -S -10 2>/dev/null)
+            local content; content=$(tmux capture-pane -t "$target:claude" -p 2>/dev/null | tail -3)
             if [[ "$content" =~ \[y/n\]|\[Y/n\]|\[yes/no\]|Enter\ to\ select|Space\ to\ select ]]; then
                 color="33"
             else
