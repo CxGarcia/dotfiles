@@ -27,15 +27,16 @@ session_dot() {
     if [[ "$cmd" != "claude" ]]; then
         color="31"
     else
-        local content; content=$(tmux capture-pane -t "$target:claude" -p -S -10 2>/dev/null)
-        if [[ "$content" =~ \[y/n\]|\[Y/n\]|\[yes/no\]|(↑/↓|↑↓).*select|to\ select.*Enter|Space\ to\ select ]]; then
-            color="33"
-        elif [[ "$content" =~ ctrl\+c\ to\ interrupt|·.*tokens ]]; then
-            color="38;5;39"
-        elif [[ "$content" == *❯* ]]; then
-            color="90"
+        local title; title=$(tmux display-message -t "$target:claude" -p '#{pane_title}' 2>/dev/null)
+        if [[ "$title" == ✳* ]]; then
+            local content; content=$(tmux capture-pane -t "$target:claude" -p -S -10 2>/dev/null)
+            if [[ "$content" =~ \[y/n\]|\[Y/n\]|\[yes/no\]|(↑/↓|↑↓).*select|to\ select.*Enter|Space\ to\ select ]]; then
+                color="33"
+            else
+                color="90"
+            fi
         else
-            color="90"; symbol="○"
+            color="38;5;39"
         fi
     fi
     printf '\033[%sm%s\033[0m' "$color" "$symbol"

@@ -129,14 +129,16 @@ async function checkSessionState(target: string): Promise<string> {
     return "exited"
   }
 
-  const content = (await $`tmux capture-pane -t ${target} -p -S -10`.quiet().nothrow()).text()
+  const title = await tmuxGet(target, "#{pane_title}")
 
-  if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(content)) return "blocked"
-  if (/(?:↑\/↓|↑↓).*select|to select.*Enter|Space to select/.test(content)) return "picker"
-  if (/ctrl\+c to interrupt|·.*tokens/.test(content)) return "working"
-  if (content.includes("❯")) return "idle"
+  if (title.startsWith("✳")) {
+    const content = (await $`tmux capture-pane -t ${target} -p -S -10`.quiet().nothrow()).text()
+    if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(content)) return "blocked"
+    if (/(?:↑\/↓|↑↓).*select|to select.*Enter|Space to select/.test(content)) return "picker"
+    return "idle"
+  }
 
-  return "unknown"
+  return "working"
 }
 
 interface Feature {
