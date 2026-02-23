@@ -86,6 +86,7 @@ async function tmuxGet(target: string, fmt: string): Promise<string> {
 }
 
 async function tmuxSend(session: string, text: string) {
+  await $`tmux send-keys -t ${session}:claude C-u`.quiet()
   await $`tmux send-keys -t ${session}:claude -l ${text}`.quiet()
   await Bun.sleep(1000)
   await $`tmux send-keys -t ${session}:claude Enter`.quiet()
