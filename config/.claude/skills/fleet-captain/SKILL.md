@@ -18,9 +18,9 @@ Discrete events from feature sessions (pushed, context_warning) appear as "Fleet
 
 Example synthesis: "auth-sso CI failing (lint check), cart-redesign needs picker #2, 2 sessions working" — never dump raw event data.
 
-Idle sessions are normal. Silence is not failure.
-
 All operations go through `scripts/fleet`.
+
+Idle sessions are normal. Silence is not failure.
 
 ## Captain's Loop
 
@@ -64,9 +64,9 @@ fleet keys <name> <keys...>            # send raw tmux keys
 fleet relay <from> <to> "<context>" [--lines N]  # capture from-output, send to to-session
 fleet share <file-path> <n1,n2> "<instr>"        # send file path + instruction to sessions
 
-# PR & CI
-fleet pr <name>                        # monitor PR: CI, reviews, merge state (polls)
-fleet pr <name> --once                 # one-shot PR status check
+# PR & CI (sessions self-monitor; captain uses --once as fallback)
+fleet pr <name>                        # poll PR CI/reviews/merge until complete
+fleet pr <name> --once                 # one-shot PR status snapshot
 
 # Metadata
 fleet desc <name> "<text>"             # update description
@@ -103,6 +103,8 @@ Before spawning, think through the work:
    - `--scope research` — Reading and analysis only. Include "Do NOT modify any files" in the prompt.
    - `--scope implement` — Building and coding.
    - `--scope any` — No constraints (default).
+
+4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include "after pushing, run `gh pr checks` to monitor CI and fix any failures" in the prompt. The captain does not poll CI — sessions self-monitor and self-heal.
 
 To invoke a workflow, include the skill in the prompt: `fleet spawn sso-login app "/workflows:brainstorm Add SSO login support"`.
 
@@ -146,15 +148,15 @@ The `--worktree` flag handles this automatically — it fetches and branches fro
 fleet send fix-auth "The previous PR was merged. Create a NEW branch off origin/main for the follow-up fix. Run 'git fetch origin main && git checkout -b worktree-fix-auth-v2 origin/main' first. Do NOT reuse the old branch."
 ```
 
-### Rule 4: Bind branch and PR in metadata at spawn time
+### Rule 4: Bind PR in metadata after creation
 
-Every session that will create commits should have its branch tracked in the registry. The spawn command does this automatically for worktree sessions. After a PR is created, update the metadata:
+The spawn command tracks the branch automatically for worktree sessions. After a PR is created, bind it:
 
 ```bash
 fleet desc fix-auth --pr 42
 ```
 
-This lets `fleet status` and `fleet pr` track the session's branch and CI status.
+This lets `fleet status` and `fleet pr` track CI status.
 
 ### Rule 5: Include branch identity in every git instruction
 
@@ -196,18 +198,11 @@ Before spawning, ask yourself:
 
 ## Monitoring
 
-**Automatic (preferred):** Fleet events and state changes arrive automatically at the start of every user message via the UserPromptSubmit hook. This includes:
-- **Hook events** — pushes, PRs, commits, context warnings (from feature session hooks)
-- **State changes** — working→idle, idle→picker, etc. (detected by polling tmux)
-- **Remediation hints** — actionable suggestions for pickers, blockers, crashes
+Events arrive automatically via the UserPromptSubmit hook (see Captain's Loop). Use manual commands only when you need a deeper look:
 
-No need to run `fleet watch` — the captain stays responsive and gets a complete picture on every turn. Just respond to the events shown in the "Fleet Events" system-reminder.
-
-**Snapshot:** `fleet status` shows one-time live state, pane output for idle/blocked/picker sessions, and pending events. Use `--tag` or `--scope` to filter.
-
-**Focused view:** `fleet check-active` shows only sessions that are working, in a picker, or blocked. Faster than `fleet status` when you only care about sessions needing attention.
-
-**Deep watch:** `fleet watch --timeout 60` blocks until events occur. Only use this from the terminal. Do NOT use it in the captain session — it blocks the user.
+- `fleet status` — full snapshot with pane output. Use `--tag` or `--scope` to filter.
+- `fleet check-active` — only working/picker/blocked sessions. Faster when you just need sessions needing attention.
+- `fleet watch --timeout 60` — blocks until events. Terminal only, never in the captain session.
 
 ## Interaction
 
@@ -258,10 +253,12 @@ Session is doing the wrong thing or going off-track:
 
 ### CI failures
 
+Feature sessions should monitor their own CI (see Spawning, item 4). The captain does not poll CI — sessions self-report failures via hooks, and fix them autonomously.
+
+If a session misses a CI failure (e.g., it went idle without noticing):
 1. `fleet pr <name> --once` — check which checks failed
-2. `fleet check <name>` — see if the session noticed
-3. If the session is idle, `fleet send <name> "CI is failing on <check>. Fix it and push."`
-4. If PR is someone else's, just report to the user
+2. `fleet send <name> "CI is failing on <check>. Fix it and push to branch <branch>."`
+3. If the PR belongs to someone else, just report to the user
 
 ### Context warnings
 
@@ -278,9 +275,7 @@ A `context_warning` event means the session is compacting context. It may lose c
 
 ## Killing & Cleanup
 
-`fleet kill <name>` kills a single session. `fleet kill name1 name2` kills multiple (confirms first). `fleet kill --idle` / `--gone` / `--all` kill by state. Use `-y` to skip confirmation. Handles tmux session, worktree, branch, and registry cleanup.
-
-After killing, check if there are remaining sessions with `fleet status`.
+`fleet kill` handles tmux session, worktree, branch, and registry cleanup automatically. See CLI Reference for variants. After killing, verify remaining sessions with `fleet status`.
 
 ## Recovery & Context
 
