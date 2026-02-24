@@ -23,6 +23,8 @@ Persistent state lives under `~/.claude/fleet/`.
 | `tmuxSession` | string | Session name (may get stale if renamed) |
 | `tmuxSessionId` | string | Stable session ID (`$N` format, survives renames) |
 | `pr` | object\|null | PR tracking object (see below) |
+| `scope` | string\|null | `research`, `implement`, or `any` (what the session is allowed to do) |
+| `tags` | string[] | Arbitrary tags for filtering |
 | `status` | string | `active`, `blocked`, `crashed`, `abandoned`, or `done` |
 | `startedAt` | string | ISO 8601 |
 | `updatedAt` | string | ISO 8601 |
@@ -44,4 +46,8 @@ Append-only NDJSON. Each line:
 |-------|------|-------------|
 | `ts` | string | ISO 8601 |
 | `feature` | string | Feature name |
-| `event` | string | `spawned`, `pushed`, `context_warning`, `pr_created`, `abandoned` |
+| `event` | string | `spawned`, `pushed`, `committed`, `context_warning`, `pr_created`, `abandoned` |
+
+## State Snapshot (`.state_snapshot`)
+
+JSON object mapping feature names to their last-seen tmux state (e.g. `{"auth-sso":"working","cart":"idle"}`). Written by `fleet poll`. Used to detect state changes between polls — only transitions are reported.

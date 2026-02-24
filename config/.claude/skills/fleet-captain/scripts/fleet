@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { Command } from "commander"
 import { $ } from "bun"
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, renameSync, readdirSync, rmSync } from "fs"
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, renameSync, readdirSync, rmSync, symlinkSync, lstatSync, readlinkSync, unlinkSync, realpathSync } from "fs"
+import { createInterface } from "readline"
 import { join, basename, resolve } from "path"
 import { homedir } from "os"
 
@@ -58,6 +59,71 @@ function requireFeature(name: string): Feature {
 function logEvent(feature: string, event: string, extra: Record<string, unknown> = {}) {
   const entry = JSON.stringify({ ts: ts(), feature, event, ...extra })
   appendFileSync(EVENTS, entry + "\n")
+}
+
+async function confirm(message: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  return new Promise((resolve) => {
+    rl.question(`${message} [y/N] `, (answer) => {
+      rl.close()
+      resolve(answer.toLowerCase() === "y")
+    })
+  })
+}
+
+function activeFeatures(): [string, Feature][] {
+  const reg = readRegistry()
+  return Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
+}
+
+async function killFeature(name: string) {
+  const feat = getFeature(name)
+  if (!feat) {
+    console.log(`SKIP: Feature '${name}' not found`)
+    return
+  }
+  const { tmuxSessionId: sid, tmuxSession: sname, repo, worktreePath, branch } = feat
+
+  let target: string | null = null
+  if (await sessionExists(sid)) target = sid
+  else if (await sessionExists(sname)) target = sname
+  if (target) {
+    await $`tmux send-keys -t ${target} C-c`.quiet().nothrow()
+    await Bun.sleep(1000)
+    await $`tmux send-keys -t ${target} -l /exit`.quiet().nothrow()
+    await $`tmux send-keys -t ${target} Enter`.quiet().nothrow()
+    await Bun.sleep(2000)
+    await $`tmux kill-session -t ${target}`.quiet().nothrow()
+    console.log(`SESSION_KILLED: ${sname}`)
+  } else {
+    console.log(`SESSION_ALREADY_GONE: ${sname}`)
+  }
+
+  if (worktreePath && existsSync(worktreePath)) {
+    await $`git -C ${repo} worktree remove --force ${worktreePath}`.quiet().nothrow()
+    console.log(`WORKTREE_REMOVED: ${worktreePath}`)
+  }
+
+  if (branch) {
+    const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
+    if (branchExists.exitCode === 0) {
+      await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
+      console.log(`BRANCH_DELETED: ${branch}`)
+    }
+  }
+
+  for (const prefix of ["teams", "tasks"]) {
+    const dir = join(HOME, ".claude", prefix)
+    if (existsSync(dir)) {
+      for (const entry of readdirSync(dir)) {
+        if (entry.startsWith("work-")) rmSync(join(dir, entry), { recursive: true, force: true })
+      }
+    }
+  }
+
+  updateFeature(name, { status: "abandoned" })
+  logEvent(name, "abandoned")
+  console.log(`DONE: ${name} abandoned and cleaned up`)
 }
 
 function readRepos(): Record<string, string> {
@@ -151,9 +217,23 @@ interface Feature {
   tmuxSession: string
   tmuxSessionId: string
   pr: { number: number; url?: string; ciStatus: string; lastChecked: string } | null
+  scope: string | null
+  tags: string[]
   status: string
   startedAt: string
   updatedAt: string
+}
+
+function formatMeta(feat: Feature): string {
+  const parts: string[] = []
+  if (feat.branch) parts.push(`branch=${feat.branch}`)
+  if (feat.pr) {
+    parts.push(`pr=#${feat.pr.number}`)
+    if (feat.pr.ciStatus && feat.pr.ciStatus !== "unknown") parts.push(`ci=${feat.pr.ciStatus}`)
+  }
+  if (feat.scope) parts.push(`scope=${feat.scope}`)
+  if (feat.tags?.length > 0) parts.push(`tags=${feat.tags.join(",")}`)
+  return parts.join(" ")
 }
 
 interface Registry {
@@ -173,6 +253,9 @@ fleet.command("spawn")
   .argument("[description]", "Prompt to send to the session")
   .option("--worktree", "Create a git worktree for isolation")
   .option("--branch <branch>", "Check out an existing branch")
+  .option("--pr <number>", "Associated PR number")
+  .option("--scope <scope>", "Session scope: research, implement, or any")
+  .option("--tag <tags>", "Comma-separated tags")
   .action(async (name, repoInput, description, opts) => {
     const repo = resolveRepo(repoInput)
     if (!repo) {
@@ -252,6 +335,10 @@ fleet.command("spawn")
     }
 
     const reg = readRegistry()
+    const pr = opts.pr ? { number: parseInt(opts.pr), ciStatus: "unknown", lastChecked: ts() } : null
+    const scope = opts.scope ?? null
+    const tags = opts.tag ? opts.tag.split(",").map((t: string) => t.trim()).filter(Boolean) : []
+
     reg.features[name] = {
       description: description ?? "",
       repo,
@@ -259,7 +346,9 @@ fleet.command("spawn")
       branch,
       tmuxSession: sessionName,
       tmuxSessionId: sessionId,
-      pr: null,
+      pr,
+      scope,
+      tags,
       status: "active",
       startedAt: ts(),
       updatedAt: ts(),
@@ -272,9 +361,14 @@ fleet.command("spawn")
 
 fleet.command("status")
   .description("Snapshot of all active features with live state and pane content")
-  .action(async () => {
+  .option("--tag <tag>", "Filter by tag")
+  .option("--scope <scope>", "Filter by scope (research, implement, any)")
+  .action(async (opts) => {
     const reg = readRegistry()
-    const active = Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
+    let active = Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
+
+    if (opts.scope) active = active.filter(([, f]) => f.scope === opts.scope)
+    if (opts.tag) active = active.filter(([, f]) => f.tags?.includes(opts.tag))
 
     if (active.length === 0) {
       console.log("NO_ACTIVE_FEATURES")
@@ -284,9 +378,10 @@ fleet.command("status")
     for (const [name, feat] of active) {
       const liveState = await checkSessionState(feat.tmuxSession)
       const repoName = basename(feat.repo)
+      const meta = formatMeta(feat)
 
       console.log(`--- ${name} ---`)
-      console.log(`live=${liveState} repo=${repoName}`)
+      console.log(`live=${liveState} repo=${repoName}${meta ? " " + meta : ""}`)
 
       if (feat.pr) {
         const prUrl = feat.pr.url ?? (await $`gh pr view ${feat.pr.number} --repo ${feat.repo} --json url -q .url`.quiet().nothrow()).text().trim()
@@ -334,13 +429,500 @@ fleet.command("check")
   .action(async (name) => {
     const feat = requireFeature(name)
     const state = await checkSessionState(feat.tmuxSession)
-    console.log(`FEATURE=${name} STATE=${state}`)
+    const meta = formatMeta(feat)
+    console.log(`FEATURE=${name} STATE=${state}${meta ? " " + meta : ""}`)
 
     if (["idle", "working", "blocked", "picker"].includes(state)) {
       console.log("PANE_OUTPUT:")
       const content = (await $`tmux capture-pane -t ${feat.tmuxSessionId} -p -S -5`.quiet().nothrow()).text()
       console.log(content)
     }
+  })
+
+fleet.command("check-active")
+  .description("Detailed state of all working/picker/blocked sessions (skips idle/gone/exited)")
+  .action(async () => {
+    const features = activeFeatures()
+    if (features.length === 0) {
+      console.log("NO_ACTIVE_FEATURES")
+      return
+    }
+
+    let found = 0
+    for (const [name, feat] of features) {
+      const state = await checkSessionState(feat.tmuxSession)
+      if (!["working", "picker", "blocked"].includes(state)) continue
+      found++
+      const repoName = basename(feat.repo)
+      const meta = formatMeta(feat)
+      console.log(`--- ${name} [${state}] repo=${repoName}${meta ? " " + meta : ""} ---`)
+      if (feat.pr) {
+        console.log(`pr=#${feat.pr.number} ci=${feat.pr.ciStatus ?? "unknown"}`)
+      }
+      const content = (await $`tmux capture-pane -t ${feat.tmuxSession}:claude -p -S -20`.quiet().nothrow()).text().trim()
+      if (content) console.log(content)
+      console.log("")
+    }
+
+    if (found === 0) console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
+  })
+
+interface CiState {
+  checks: Record<string, string>
+  overallCi: string
+  commentCount: number
+  reviewCount: number
+  mergeable: string
+  lastReviewIds: number[]
+}
+
+interface CiEvent {
+  ts: string
+  type: string
+  priority: number
+  detail: string
+}
+
+function ciStateFile(name: string): string {
+  return join(FLEET_DIR, `.ci_state_${name}.json`)
+}
+
+function readCiState(name: string): CiState | null {
+  const path = ciStateFile(name)
+  if (!existsSync(path)) return null
+  try { return JSON.parse(readFileSync(path, "utf-8")) } catch { return null }
+}
+
+function writeCiState(name: string, state: CiState) {
+  writeFileSync(ciStateFile(name), JSON.stringify(state, null, 2))
+}
+
+async function getOwnerRepo(repoPath: string): Promise<string> {
+  const remote = (await $`git -C ${repoPath} remote get-url origin`.quiet().nothrow()).text().trim()
+  const match = remote.match(/github\.com[:/](.+?)(?:\.git)?$/)
+  return match ? match[1] : ""
+}
+
+async function resolvePrNumber(feat: Feature): Promise<number | null> {
+  if (feat.pr?.number) return feat.pr.number
+  if (!feat.branch) return null
+  const result = await $`gh pr view ${feat.branch} --repo ${feat.repo} --json number -q .number`.quiet().nothrow()
+  const num = parseInt(result.text().trim())
+  return isNaN(num) ? null : num
+}
+
+async function fetchCiSnapshot(repoPath: string, prNumber: number): Promise<CiState> {
+  const ownerRepo = await getOwnerRepo(repoPath)
+
+  const [checksResult, prResult, reviewsResult, commentsResult] = await Promise.all([
+    $`gh pr checks ${prNumber} --repo ${ownerRepo} --json name,state`.quiet().nothrow(),
+    $`gh api repos/${ownerRepo}/pulls/${prNumber} -q '{mergeable_state: .mergeable_state, mergeable: .mergeable}'`.quiet().nothrow(),
+    $`gh api repos/${ownerRepo}/pulls/${prNumber}/reviews -q '[.[] | {id, state}]'`.quiet().nothrow(),
+    $`gh api repos/${ownerRepo}/pulls/${prNumber}/comments -q 'length'`.quiet().nothrow(),
+  ])
+
+  const checks: Record<string, string> = {}
+  let overallCi = "unknown"
+  try {
+    const parsed = JSON.parse(checksResult.text().trim())
+    if (Array.isArray(parsed)) {
+      let hasFailure = false
+      let hasPending = false
+      for (const c of parsed) {
+        const status = (c.state ?? "PENDING").toUpperCase()
+        if (status === "SKIPPED") continue
+        checks[c.name] = status.toLowerCase()
+        if (["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "ERROR", "STARTUP_FAILURE"].includes(status)) hasFailure = true
+        else if (["PENDING", "QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED", "EXPECTED"].includes(status)) hasPending = true
+      }
+      overallCi = hasFailure ? "failing" : hasPending ? "pending" : Object.keys(checks).length > 0 ? "passing" : "unknown"
+    }
+  } catch {}
+
+  let mergeable = "unknown"
+  try {
+    const pr = JSON.parse(prResult.text().trim())
+    mergeable = pr.mergeable_state ?? (pr.mergeable ? "mergeable" : "unknown")
+  } catch {}
+
+  let reviewCount = 0
+  let lastReviewIds: number[] = []
+  try {
+    const reviews = JSON.parse(reviewsResult.text().trim())
+    reviewCount = reviews.length
+    lastReviewIds = reviews.map((r: { id: number }) => r.id)
+  } catch {}
+
+  const commentCount = parseInt(commentsResult.text().trim()) || 0
+
+  return { checks, overallCi, commentCount, reviewCount, mergeable, lastReviewIds }
+}
+
+function diffCiStates(prev: CiState, curr: CiState): CiEvent[] {
+  const events: CiEvent[] = []
+
+  if (prev.overallCi !== curr.overallCi) {
+    if (curr.overallCi === "failing") {
+      const failed = Object.entries(curr.checks).filter(([, v]) => ["failure", "cancelled", "timed_out"].includes(v)).map(([k]) => k)
+      events.push({ ts: ts(), type: "ci_failure", priority: 0, detail: `CI: ${prev.overallCi} → failing (${failed.join(", ")})` })
+    } else if (curr.overallCi === "passing") {
+      events.push({ ts: ts(), type: "ci_success", priority: 1, detail: `CI: ${prev.overallCi} → passing` })
+    } else if (curr.overallCi === "pending") {
+      events.push({ ts: ts(), type: "ci_pending", priority: 2, detail: `CI: ${prev.overallCi} → pending` })
+    }
+  } else {
+    for (const [name, status] of Object.entries(curr.checks)) {
+      if (prev.checks[name] && prev.checks[name] !== status) {
+        const prio = ["failure", "cancelled", "timed_out"].includes(status) ? 0 : status === "success" ? 2 : 2
+        events.push({ ts: ts(), type: "check_change", priority: prio, detail: `check ${name}: ${prev.checks[name]} → ${status}` })
+      }
+    }
+  }
+
+  if (prev.mergeable !== curr.mergeable) {
+    if (["dirty", "unstable"].includes(curr.mergeable)) {
+      events.push({ ts: ts(), type: "merge_conflict", priority: 0, detail: `merge state: ${prev.mergeable} → ${curr.mergeable}` })
+    } else {
+      events.push({ ts: ts(), type: "merge_state", priority: 2, detail: `merge state: ${prev.mergeable} → ${curr.mergeable}` })
+    }
+  }
+
+  if (curr.reviewCount > prev.reviewCount) {
+    const newCount = curr.reviewCount - prev.reviewCount
+    events.push({ ts: ts(), type: "new_reviews", priority: 1, detail: `${newCount} new review(s)` })
+  }
+
+  if (curr.commentCount > prev.commentCount) {
+    const newCount = curr.commentCount - prev.commentCount
+    events.push({ ts: ts(), type: "new_comments", priority: 1, detail: `${newCount} new comment(s)` })
+  }
+
+  return events
+}
+
+interface WatchEvent {
+  ts: string
+  feature: string
+  type: string
+  priority: number
+  from?: string
+  to?: string
+  url?: string
+  branch?: string
+  message?: string
+}
+
+function watchEventPriority(type: string, state?: string): number {
+  if (type === "state_change") {
+    if (state === "picker" || state === "blocked") return 0
+    if (state === "idle" || state === "gone" || state === "exited" || state?.startsWith("crashed")) return 1
+    if (state === "working") return 2
+    return 3
+  }
+  switch (type) {
+    case "push_failed": return 1
+    case "pr_created": return 2
+    case "pushed": return 2
+    case "committed": return 2
+    case "context_warning": return 3
+    case "spawned": return 3
+    case "abandoned": return 3
+    default: return 3
+  }
+}
+
+fleet.command("watch")
+  .description("Block until fleet events occur or timeout expires")
+  .option("--timeout <seconds>", "Max wait in seconds", "60")
+  .option("--interval <seconds>", "State polling interval in seconds", "3")
+  .action(async (opts) => {
+    const timeout = parseInt(opts.timeout)
+    const interval = parseFloat(opts.interval)
+    const features = activeFeatures()
+
+    if (features.length === 0) {
+      console.log("WATCH: no active features")
+      return
+    }
+
+    const snapshot: Record<string, string> = {}
+    for (const [name, feat] of features) {
+      snapshot[name] = await checkSessionState(feat.tmuxSession)
+    }
+
+    const offsetFile = join(FLEET_DIR, ".events_offset")
+    let lastOffset = existsSync(offsetFile) ? parseInt(readFileSync(offsetFile, "utf-8")) || 0 : 0
+
+    const startTime = Date.now()
+    const collected: WatchEvent[] = []
+
+    function collectFileEvents() {
+      if (!existsSync(EVENTS)) return
+      const content = readFileSync(EVENTS, "utf-8")
+      const currentSize = Buffer.byteLength(content)
+      if (currentSize <= lastOffset) return
+
+      const newLines = Buffer.from(content).subarray(lastOffset).toString().split("\n").filter(Boolean)
+      for (const line of newLines) {
+        try {
+          const e = JSON.parse(line)
+          collected.push({
+            ts: e.ts,
+            feature: e.feature,
+            type: e.event,
+            priority: watchEventPriority(e.event),
+            ...(e.url && { url: e.url }),
+            ...(e.branch && { branch: e.branch }),
+            ...(e.message && { message: e.message }),
+          })
+        } catch {}
+      }
+      lastOffset = currentSize
+    }
+
+    async function collectStateChanges() {
+      for (const [name, feat] of features) {
+        const current = await checkSessionState(feat.tmuxSession)
+        const previous = snapshot[name]
+        if (current !== previous) {
+          collected.push({
+            ts: ts(),
+            feature: name,
+            type: "state_change",
+            from: previous,
+            to: current,
+            priority: watchEventPriority("state_change", current),
+          })
+          snapshot[name] = current
+        }
+      }
+    }
+
+    while ((Date.now() - startTime) / 1000 < timeout) {
+      collectFileEvents()
+      await collectStateChanges()
+
+      if (collected.length > 0) {
+        await Bun.sleep(2000)
+        collectFileEvents()
+        await collectStateChanges()
+        break
+      }
+
+      await Bun.sleep(interval * 1000)
+    }
+
+    writeFileSync(offsetFile, String(lastOffset))
+    collected.sort((a, b) => a.priority - b.priority || a.ts.localeCompare(b.ts))
+
+    const elapsed = Math.round((Date.now() - startTime) / 1000)
+
+    if (collected.length === 0) {
+      console.log(`WATCH: no events (${elapsed}s)`)
+    } else {
+      console.log(`WATCH: ${collected.length} event(s) in ${elapsed}s`)
+
+      const actionable = collected.filter(e => e.priority <= 1)
+      if (actionable.length > 0) {
+        console.log("\n--- needs attention ---")
+        for (const e of actionable) {
+          if (e.type === "state_change") {
+            const hint = e.to === "picker" ? `fleet check ${e.feature}; fleet pick ${e.feature} <N>` :
+                         e.to === "blocked" ? `fleet check ${e.feature}; fleet keys ${e.feature} y/n` :
+                         e.to === "idle" ? `fleet check ${e.feature}` :
+                         e.to === "gone" || e.to === "exited" ? `fleet kill --gone` :
+                         e.to?.startsWith("crashed") ? `fleet check ${e.feature}` : ""
+            console.log(`  ${e.feature}: ${e.from} → ${e.to}${hint ? ` — ${hint}` : ""}`)
+          } else {
+            console.log(`  ${e.feature}: ${e.type}`)
+          }
+        }
+      }
+
+      console.log("\n--- events ---")
+      for (const e of collected) {
+        if (e.type === "state_change") {
+          console.log(`  ${e.feature}: ${e.from} → ${e.to}`)
+        } else if (e.type === "pr_created") {
+          console.log(`  ${e.feature}: PR created ${e.url ?? ""}`)
+        } else if (e.type === "pushed") {
+          console.log(`  ${e.feature}: pushed ${e.branch ?? ""}`)
+        } else if (e.type === "committed") {
+          console.log(`  ${e.feature}: committed${e.message ? " " + e.message : ""}`)
+        } else if (e.type === "context_warning") {
+          console.log(`  ${e.feature}: context compacting`)
+        } else {
+          console.log(`  ${e.feature}: ${e.type}`)
+        }
+      }
+    }
+
+    console.log("\n--- states ---")
+    console.log(Object.entries(snapshot).map(([n, s]) => `${n}=${s}`).join(" "))
+  })
+
+fleet.command("pr")
+  .description("Monitor PR status: CI checks, reviews, comments, and merge state")
+  .argument("<name>", "Feature name")
+  .option("--once", "One-shot check, no polling")
+  .option("--timeout <seconds>", "Max polling duration in seconds", "120")
+  .action(async (name, opts) => {
+    const feat = requireFeature(name)
+    const prNumber = await resolvePrNumber(feat)
+    if (!prNumber) {
+      console.error(`ERROR: No PR found for '${name}'. Set one with 'fleet desc ${name} --pr <number>' or push a branch first.`)
+      process.exit(1)
+    }
+
+    if (!feat.pr) {
+      updateFeature(name, { pr: { number: prNumber, ciStatus: "unknown", lastChecked: ts() } })
+    }
+
+    const ownerRepo = await getOwnerRepo(feat.repo)
+    console.log(`CI: monitoring PR #${prNumber} (${ownerRepo})`)
+
+    if (opts.once) {
+      const snapshot = await fetchCiSnapshot(feat.repo, prNumber)
+      writeCiState(name, snapshot)
+      updateFeature(name, { pr: { number: prNumber, ciStatus: snapshot.overallCi, lastChecked: ts() } })
+
+      console.log(`\n--- CI Status ---`)
+      console.log(`overall: ${snapshot.overallCi}`)
+      for (const [checkName, status] of Object.entries(snapshot.checks)) {
+        const icon = status === "success" ? "+" : ["failure", "cancelled", "timed_out"].includes(status) ? "X" : "~"
+        console.log(`  [${icon}] ${checkName}: ${status}`)
+      }
+
+      console.log(`\n--- Reviews & Comments ---`)
+      console.log(`reviews: ${snapshot.reviewCount}`)
+      console.log(`comments: ${snapshot.commentCount}`)
+
+      console.log(`\n--- Merge State ---`)
+      console.log(`mergeable: ${snapshot.mergeable}`)
+
+      logEvent(name, "ci_checked", { pr: prNumber, ci: snapshot.overallCi, mergeable: snapshot.mergeable })
+      return
+    }
+
+    let prev = readCiState(name) ?? await fetchCiSnapshot(feat.repo, prNumber)
+    writeCiState(name, prev)
+
+    console.log(`initial: ci=${prev.overallCi} mergeable=${prev.mergeable} reviews=${prev.reviewCount} comments=${prev.commentCount}`)
+    console.log(`polling every 15s (timeout ${opts.timeout}s)...\n`)
+
+    const timeout = parseInt(opts.timeout)
+    const startTime = Date.now()
+    const allEvents: CiEvent[] = []
+
+    while ((Date.now() - startTime) / 1000 < timeout) {
+      await Bun.sleep(15000)
+
+      const curr = await fetchCiSnapshot(feat.repo, prNumber)
+      const events = diffCiStates(prev, curr)
+
+      if (events.length > 0) {
+        for (const e of events) {
+          const tag = e.priority === 0 ? "P0" : e.priority === 1 ? "P1" : "P2"
+          console.log(`[${tag}] ${e.detail}`)
+          allEvents.push(e)
+        }
+      }
+
+      writeCiState(name, curr)
+      updateFeature(name, { pr: { number: prNumber, ciStatus: curr.overallCi, lastChecked: ts() } })
+      prev = curr
+
+      if (curr.overallCi === "failing") {
+        console.log(`\nCI failed — stopping poll`)
+        break
+      }
+      if (curr.overallCi === "passing" && curr.mergeable === "clean") {
+        console.log(`\nCI passing + mergeable — stopping poll`)
+        break
+      }
+    }
+
+    const elapsed = Math.round((Date.now() - startTime) / 1000)
+    const p0 = allEvents.filter(e => e.priority === 0)
+    const p1 = allEvents.filter(e => e.priority === 1)
+
+    console.log(`\n--- summary (${elapsed}s) ---`)
+    console.log(`ci=${prev.overallCi} mergeable=${prev.mergeable} reviews=${prev.reviewCount} comments=${prev.commentCount}`)
+    if (p0.length > 0) {
+      console.log(`\n--- needs attention ---`)
+      for (const e of p0) console.log(`  ${e.detail}`)
+    }
+    if (p1.length > 0) {
+      console.log(`\n--- actionable ---`)
+      for (const e of p1) console.log(`  ${e.detail}`)
+    }
+    if (allEvents.length === 0) console.log(`no changes detected`)
+
+    logEvent(name, "ci_monitored", { pr: prNumber, ci: prev.overallCi, events: allEvents.length, elapsed })
+  })
+
+fleet.command("poll")
+  .description("Non-blocking check for new events and state changes (used by hooks)")
+  .action(async () => {
+    const features = activeFeatures()
+    if (features.length === 0) return
+
+    const snapshotFile = join(FLEET_DIR, ".state_snapshot")
+    let snapshot: Record<string, string> = {}
+    if (existsSync(snapshotFile)) {
+      try { snapshot = JSON.parse(readFileSync(snapshotFile, "utf-8")) } catch {}
+    }
+
+    const offsetFile = join(FLEET_DIR, ".events_offset")
+    let lastOffset = existsSync(offsetFile) ? parseInt(readFileSync(offsetFile, "utf-8")) || 0 : 0
+
+    const events: string[] = []
+
+    if (existsSync(EVENTS)) {
+      const content = readFileSync(EVENTS, "utf-8")
+      const currentSize = Buffer.byteLength(content)
+      if (currentSize > lastOffset) {
+        const newLines = Buffer.from(content).subarray(lastOffset).toString().split("\n").filter(Boolean)
+        const deduped = new Map<string, { event: string; feature: string; url?: string; branch?: string; message?: string }>()
+        for (const line of newLines) {
+          try {
+            const e = JSON.parse(line)
+            deduped.set(`${e.feature}:${e.event}`, e)
+          } catch {}
+        }
+        for (const e of deduped.values()) {
+          if (e.event === "pr_created") events.push(`  ${e.feature}: PR created ${e.url ?? ""}`)
+          else if (e.event === "pushed") events.push(`  ${e.feature}: pushed ${e.branch ?? ""}`)
+          else if (e.event === "committed") events.push(`  ${e.feature}: committed`)
+          else if (e.event === "context_warning") events.push(`  ${e.feature}: context compacting — may lose coherence`)
+          else events.push(`  ${e.feature}: ${e.event}`)
+        }
+        lastOffset = currentSize
+      }
+    }
+
+    const newSnapshot: Record<string, string> = {}
+    for (const [name, feat] of features) {
+      const current = await checkSessionState(feat.tmuxSession)
+      newSnapshot[name] = current
+      const previous = snapshot[name]
+      if (previous && previous !== current) {
+        const hint = current === "picker" ? ` — fleet pick ${name} <N>` :
+                     current === "blocked" ? ` — fleet keys ${name} y/n` :
+                     current === "gone" || current === "exited" ? ` — fleet kill --gone` :
+                     current?.startsWith("crashed") ? ` — fleet check ${name}` : ""
+        events.push(`  ${name}: ${previous} → ${current}${hint}`)
+      }
+    }
+
+    writeFileSync(offsetFile, String(lastOffset))
+    writeFileSync(snapshotFile, JSON.stringify(newSnapshot))
+
+    if (events.length === 0) return
+
+    console.log(`--- Fleet Events (${events.length} new) ---`)
+    for (const e of events) console.log(e)
+    console.log("--- End Fleet Events ---")
   })
 
 fleet.command("send")
@@ -368,6 +950,43 @@ fleet.command("send")
     const text = command.join(" ")
     await tmuxSend(feat.tmuxSession, text)
     console.log(`SENT (state was ${state}): ${text}`)
+  })
+
+fleet.command("send-multi")
+  .description("Send the same message to multiple sessions")
+  .argument("<names>", "Comma-separated feature names")
+  .argument("<command...>", "Command text to send")
+  .action(async (namesStr: string, command: string[]) => {
+    const names = namesStr.split(",").map(n => n.trim()).filter(Boolean)
+    const text = command.join(" ")
+
+    if (names.length === 0) {
+      console.error("ERROR: Provide comma-separated feature names")
+      process.exit(1)
+    }
+
+    for (const name of names) {
+      const feat = getFeature(name)
+      if (!feat) {
+        console.log(`SKIP: ${name} not found`)
+        continue
+      }
+      const state = await checkSessionState(feat.tmuxSession)
+      if (["gone", "exited"].includes(state) || state.startsWith("crashed")) {
+        console.log(`SKIP: ${name} is ${state}`)
+        continue
+      }
+      if (state === "picker") {
+        console.log(`SKIP: ${name} is showing a picker`)
+        continue
+      }
+      if (state === "blocked") {
+        console.log(`SKIP: ${name} is waiting for confirmation`)
+        continue
+      }
+      await tmuxSend(feat.tmuxSession, text)
+      console.log(`SENT to ${name} (state was ${state}): ${text}`)
+    }
   })
 
 fleet.command("pick")
@@ -401,52 +1020,50 @@ fleet.command("keys")
   })
 
 fleet.command("kill")
-  .description("Clean up a feature session: session, worktree, branch")
-  .argument("<name>", "Feature name")
-  .action(async (name) => {
-    const feat = requireFeature(name)
-    const { tmuxSessionId: sid, tmuxSession: sname, repo, worktreePath, branch } = feat
+  .description("Kill feature sessions: one, many, or by state (--all, --idle, --gone)")
+  .argument("[names...]", "Feature names to kill")
+  .option("--all", "Kill all active sessions")
+  .option("--idle", "Kill all idle sessions")
+  .option("--gone", "Clean up all gone/exited/crashed sessions")
+  .option("-y, --yes", "Skip confirmation")
+  .action(async (names: string[], opts) => {
+    let targets: string[] = []
 
-    let target: string | null = null
-    if (await sessionExists(sid)) target = sid
-    else if (await sessionExists(sname)) target = sname
-    if (target) {
-      await $`tmux send-keys -t ${target} C-c`.quiet().nothrow()
-      await Bun.sleep(1000)
-      await $`tmux send-keys -t ${target} -l /exit`.quiet().nothrow()
-      await $`tmux send-keys -t ${target} Enter`.quiet().nothrow()
-      await Bun.sleep(2000)
-      await $`tmux kill-session -t ${target}`.quiet().nothrow()
-      console.log(`SESSION_KILLED: ${sname}`)
+    if (opts.all) {
+      targets = activeFeatures().map(([n]) => n)
+    } else if (opts.idle || opts.gone) {
+      for (const [name, feat] of activeFeatures()) {
+        const state = await checkSessionState(feat.tmuxSession)
+        if (opts.idle && state === "idle") targets.push(name)
+        if (opts.gone && (["gone", "exited"].includes(state) || state.startsWith("crashed"))) targets.push(name)
+      }
+    } else if (names.length > 0) {
+      for (const name of names) requireFeature(name)
+      targets = names
     } else {
-      console.log(`SESSION_ALREADY_GONE: ${sname}`)
+      console.error("ERROR: Provide feature names, or use --all, --idle, --gone")
+      process.exit(1)
     }
 
-    if (worktreePath && existsSync(worktreePath)) {
-      await $`git -C ${repo} worktree remove --force ${worktreePath}`.quiet().nothrow()
-      console.log(`WORKTREE_REMOVED: ${worktreePath}`)
+    if (targets.length === 0) {
+      console.log("NO_MATCHING_SESSIONS")
+      return
     }
 
-    if (branch) {
-      const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
-      if (branchExists.exitCode === 0) {
-        await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
-        console.log(`BRANCH_DELETED: ${branch}`)
+    console.log(`Will kill ${targets.length} session(s):`)
+    for (const name of targets) console.log(`  - ${name}`)
+
+    if (!opts.yes && targets.length > 1) {
+      if (!await confirm("\nProceed?")) {
+        console.log("CANCELLED")
+        return
       }
     }
 
-    for (const prefix of ["teams", "tasks"]) {
-      const dir = join(HOME, ".claude", prefix)
-      if (existsSync(dir)) {
-        for (const entry of readdirSync(dir)) {
-          if (entry.startsWith("work-")) rmSync(join(dir, entry), { recursive: true, force: true })
-        }
-      }
+    for (const name of targets) {
+      if (targets.length > 1) console.log(`\n--- killing ${name} ---`)
+      await killFeature(name)
     }
-
-    updateFeature(name, { status: "abandoned" })
-    logEvent(name, "abandoned")
-    console.log(`DONE: ${name} abandoned and cleaned up`)
   })
 
 fleet.command("list")
@@ -515,15 +1132,41 @@ fleet.command("prune")
   })
 
 fleet.command("desc")
-  .description("Update feature description (and picker label)")
+  .description("Update feature description and metadata")
   .argument("<name>", "Feature name")
-  .argument("<text...>", "New description")
-  .action(async (name, text) => {
+  .argument("[text...]", "New description")
+  .option("--branch <branch>", "Set target branch")
+  .option("--pr <number>", "Set associated PR number")
+  .option("--scope <scope>", "Set scope: research, implement, or any")
+  .option("--tag <tags>", "Set comma-separated tags")
+  .action(async (name, text, opts) => {
     const feat = requireFeature(name)
-    const desc = text.join(" ")
-    await $`tmux set-option -t ${feat.tmuxSession} @claude_task ${desc}`.quiet().nothrow()
-    updateFeature(name, { description: desc })
-    console.log(`DESC_UPDATED: ${name} -> ${desc}`)
+    const updates: Partial<Feature> = {}
+
+    if (text.length > 0) {
+      const desc = text.join(" ")
+      await $`tmux set-option -t ${feat.tmuxSession} @claude_task ${desc}`.quiet().nothrow()
+      updates.description = desc
+    }
+
+    if (opts.branch) updates.branch = opts.branch
+    if (opts.pr) updates.pr = { number: parseInt(opts.pr), ciStatus: feat.pr?.ciStatus ?? "unknown", lastChecked: ts() }
+    if (opts.scope) updates.scope = opts.scope
+    if (opts.tag) updates.tags = opts.tag.split(",").map((t: string) => t.trim()).filter(Boolean)
+
+    if (Object.keys(updates).length === 0) {
+      console.error("ERROR: Provide description text or metadata flags")
+      process.exit(1)
+    }
+
+    updateFeature(name, updates)
+    const parts: string[] = []
+    if (updates.description) parts.push(`desc="${updates.description}"`)
+    if (updates.branch) parts.push(`branch=${updates.branch}`)
+    if (updates.pr) parts.push(`pr=#${updates.pr.number}`)
+    if (updates.scope) parts.push(`scope=${updates.scope}`)
+    if (updates.tags) parts.push(`tags=${updates.tags.join(",")}`)
+    console.log(`UPDATED: ${name} ${parts.join(" ")}`)
   })
 
 const reposCmd = fleet.command("repos")
@@ -558,6 +1201,220 @@ reposCmd.command("rm")
     delete repos[name]
     writeRepos(repos)
     console.log(`REMOVED: ${name}`)
+  })
+
+fleet.command("install")
+  .description("Install fleet to ~/.local/bin for PATH availability")
+  .action(() => {
+    const scriptPath = realpathSync(import.meta.path)
+    const binDir = join(HOME, ".local", "bin")
+    const linkPath = join(binDir, "fleet")
+
+    mkdirSync(binDir, { recursive: true })
+
+    if (existsSync(linkPath)) {
+      try {
+        const stat = lstatSync(linkPath)
+        if (stat.isSymbolicLink()) {
+          const target = readlinkSync(linkPath)
+          const resolvedTarget = resolve(join(HOME, ".local", "bin"), target)
+          if (resolvedTarget === scriptPath) {
+            console.log(`ALREADY_INSTALLED: ${linkPath} -> ${scriptPath}`)
+            return
+          }
+          unlinkSync(linkPath)
+          console.log(`REPLACED: old symlink removed`)
+        } else {
+          console.error(`ERROR: ${linkPath} exists and is not a symlink. Remove it manually.`)
+          process.exit(1)
+        }
+      } catch (e) {
+        console.error(`ERROR: Could not inspect ${linkPath}: ${e}`)
+        process.exit(1)
+      }
+    }
+
+    symlinkSync(scriptPath, linkPath)
+    console.log(`INSTALLED: ${linkPath} -> ${scriptPath}`)
+
+    const pathDirs = (process.env.PATH ?? "").split(":")
+    if (!pathDirs.includes(binDir)) {
+      console.log(`\nWARNING: ${binDir} is not in your PATH`)
+      console.log(`Add it to your shell config:`)
+      console.log(`  fish:  fish_add_path $HOME/.local/bin`)
+      console.log(`  bash:  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`)
+      console.log(`  zsh:   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`)
+    } else {
+      console.log(`PATH: ~/.local/bin is already in PATH`)
+    }
+
+    const completionsDir = join(HOME, ".config", "fish", "completions")
+    if (existsSync(join(HOME, ".config", "fish"))) {
+      mkdirSync(completionsDir, { recursive: true })
+      const completionsPath = join(completionsDir, "fleet.fish")
+      const subcommands = [
+        ["spawn", "Create a new feature session"],
+        ["status", "Snapshot of all active features"],
+        ["check", "Detailed state of one feature"],
+        ["check-active", "State of working/picker/blocked sessions"],
+        ["pr", "Monitor PR: CI, reviews, comments, merge state"],
+        ["poll", "Non-blocking event + state check (used by hooks)"],
+        ["send", "Send text to a session"],
+        ["send-multi", "Send message to multiple sessions"],
+        ["watch", "Block until fleet events occur"],
+        ["kill", "Kill feature sessions"],
+        ["list", "List fleet-managed tmux sessions"],
+        ["pick", "Select option in a picker"],
+        ["keys", "Send raw tmux keys"],
+        ["recover", "Reconcile registry after restart"],
+        ["prune", "Trim events.jsonl"],
+        ["desc", "Update feature description"],
+        ["relay", "Relay output from one session to another"],
+        ["share", "Share a file with multiple sessions"],
+        ["repos", "Manage repo shortname index"],
+        ["install", "Install fleet to ~/.local/bin"],
+        ["uninstall", "Remove fleet from ~/.local/bin"],
+      ]
+      const featureCompletion = `function __fleet_features\n    set -l reg "$HOME/.claude/fleet/registry.json"\n    test -f "$reg" && jq -r '.features | keys[]' "$reg" 2>/dev/null\nend`
+      const lines = [
+        "# fleet CLI completions (auto-generated by fleet install)",
+        featureCompletion,
+        "",
+        "complete -c fleet -f",
+        ...subcommands.map(([cmd, desc]) => `complete -c fleet -n '__fish_use_subcommand' -a '${cmd}' -d '${desc}'`),
+        "",
+        "# Feature name completions for commands that take a feature argument",
+        ...["check", "pr", "send", "kill", "pick", "keys", "desc", "relay"].map(
+          cmd => `complete -c fleet -n '__fish_seen_subcommand_from ${cmd}' -a '(__fleet_features)'`
+        ),
+      ]
+      writeFileSync(completionsPath, lines.join("\n") + "\n")
+      console.log(`COMPLETIONS: ${completionsPath}`)
+    }
+  })
+
+fleet.command("uninstall")
+  .description("Remove fleet from ~/.local/bin")
+  .action(() => {
+    const linkPath = join(HOME, ".local", "bin", "fleet")
+
+    if (!existsSync(linkPath)) {
+      console.log(`NOT_INSTALLED: ${linkPath} does not exist`)
+      return
+    }
+
+    const stat = lstatSync(linkPath)
+    if (!stat.isSymbolicLink()) {
+      console.error(`ERROR: ${linkPath} is not a symlink. Remove it manually.`)
+      process.exit(1)
+    }
+
+    unlinkSync(linkPath)
+    console.log(`UNINSTALLED: ${linkPath} removed`)
+
+    const completionsPath = join(HOME, ".config", "fish", "completions", "fleet.fish")
+    if (existsSync(completionsPath)) {
+      unlinkSync(completionsPath)
+      console.log(`COMPLETIONS_REMOVED: ${completionsPath}`)
+    }
+  })
+
+async function capturePaneOutput(session: string, lines = 50): Promise<string> {
+  return (await $`tmux capture-pane -t ${session}:claude -p -S -${lines}`.quiet().nothrow()).text().trim()
+}
+
+fleet.command("relay")
+  .description("Capture output from one session and send it to another with context")
+  .argument("<from>", "Source feature name")
+  .argument("<to>", "Target feature name")
+  .argument("<context>", "Context message to prefix the relayed output")
+  .option("--lines <n>", "Number of pane lines to capture", "50")
+  .action(async (from, to, context, opts) => {
+    const fromFeat = requireFeature(from)
+    const toFeat = requireFeature(to)
+    const lines = parseInt(opts.lines)
+
+    const fromState = await checkSessionState(fromFeat.tmuxSession)
+    if (fromState === "gone" || fromState === "exited" || fromState.startsWith("crashed")) {
+      console.error(`ERROR: Source session '${from}' is ${fromState}`)
+      process.exit(1)
+    }
+
+    const toState = await checkSessionState(toFeat.tmuxSession)
+    if (toState === "gone" || toState === "exited" || toState.startsWith("crashed")) {
+      console.error(`ERROR: Target session '${to}' is ${toState}`)
+      process.exit(1)
+    }
+    if (toState === "picker") {
+      console.error(`ERROR: Target session '${to}' is showing a picker. Dismiss it first.`)
+      process.exit(1)
+    }
+    if (toState === "blocked") {
+      console.error(`ERROR: Target session '${to}' is waiting for confirmation. Respond first.`)
+      process.exit(1)
+    }
+
+    const output = await capturePaneOutput(fromFeat.tmuxSession, lines)
+    if (!output) {
+      console.error(`ERROR: No output captured from '${from}'`)
+      process.exit(1)
+    }
+
+    const message = `${context}\n\n--- Output from session '${from}' ---\n${output}\n--- End output ---`
+    await tmuxSend(toFeat.tmuxSession, message)
+
+    logEvent(from, "relayed", { to, context })
+    console.log(`RELAYED: ${from} -> ${to} (${lines} lines, context: "${context}")`)
+  })
+
+fleet.command("share")
+  .description("Send a file path and instruction to multiple sessions")
+  .argument("<file-path>", "Path to the file to share")
+  .argument("<sessions>", "Comma-separated feature names")
+  .argument("<instruction>", "Instruction to send along with the file")
+  .action(async (filePath, sessionsStr, instruction) => {
+    const resolvedPath = resolve(filePath)
+    if (!existsSync(resolvedPath)) {
+      console.error(`ERROR: File not found: ${resolvedPath}`)
+      process.exit(1)
+    }
+
+    const names = sessionsStr.split(",").map((n: string) => n.trim()).filter(Boolean)
+    if (names.length === 0) {
+      console.error("ERROR: Provide comma-separated feature names")
+      process.exit(1)
+    }
+
+    const message = `${instruction}\n\nPlease read this file: ${resolvedPath}`
+
+    let sent = 0
+    for (const name of names) {
+      const feat = getFeature(name)
+      if (!feat) {
+        console.log(`SKIP: ${name} not found`)
+        continue
+      }
+      const state = await checkSessionState(feat.tmuxSession)
+      if (["gone", "exited"].includes(state) || state.startsWith("crashed")) {
+        console.log(`SKIP: ${name} is ${state}`)
+        continue
+      }
+      if (state === "picker") {
+        console.log(`SKIP: ${name} is showing a picker`)
+        continue
+      }
+      if (state === "blocked") {
+        console.log(`SKIP: ${name} is waiting for confirmation`)
+        continue
+      }
+
+      await tmuxSend(feat.tmuxSession, message)
+      console.log(`SENT to ${name} (state was ${state})`)
+      sent++
+    }
+
+    logEvent("share", "shared", { file: resolvedPath, sessions: names, instruction })
+    console.log(`\nSHARED: ${resolvedPath} -> ${sent}/${names.length} session(s)`)
   })
 
 fleet.parse()

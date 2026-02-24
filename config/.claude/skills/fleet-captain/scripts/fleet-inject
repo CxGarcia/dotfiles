@@ -1,37 +1,20 @@
 #!/usr/bin/env bash
+# fleet-inject — Surface fleet events and state changes at the start of each turn.
+# Runs as a UserPromptSubmit hook. Delegates to `fleet poll` for combined
+# file-event + state-change detection.
 
 FLEET_DIR="$HOME/.claude/fleet"
-EVENTS_FILE="$FLEET_DIR/events.jsonl"
-OFFSET_FILE="$FLEET_DIR/.events_offset"
+REGISTRY="$FLEET_DIR/registry.json"
+FLEET_BIN="$HOME/.claude/skills/fleet-captain/scripts/fleet"
 
-[ -f "$EVENTS_FILE" ] || exit 0
+[ -f "$REGISTRY" ] || exit 0
 
-CURRENT_SIZE=$(wc -c < "$EVENTS_FILE" | tr -d ' ')
-LAST_OFFSET=0
-[ -f "$OFFSET_FILE" ] && LAST_OFFSET=$(cat "$OFFSET_FILE")
+HAS_ACTIVE=$(jq -e '[.features // {} | to_entries[] | select(.value.status != "done" and .value.status != "abandoned")] | length > 0' "$REGISTRY" 2>/dev/null)
+[ "$HAS_ACTIVE" = "true" ] || exit 0
 
-[ "$CURRENT_SIZE" -gt "$LAST_OFFSET" ] || exit 0
-
-NEW_EVENTS=$(tail -c +"$((LAST_OFFSET + 1))" "$EVENTS_FILE")
-echo "$CURRENT_SIZE" > "$OFFSET_FILE"
-
-[ -n "$NEW_EVENTS" ] || exit 0
-
-FORMATTED=$(echo "$NEW_EVENTS" | jq -rs '
-  group_by(.feature + ":" + .event) | map(last) | sort_by(.ts) |
-  if length == 0 then halt_error(1) else . end |
-  "--- Fleet Events (\(length) new) ---\n" +
-  (map(
-    if .event == "pr_created" then "  \(.feature): PR created \(.url // "")"
-    elif .event == "pushed" then "  \(.feature): pushed \(.branch // "")"
-    elif .event == "context_warning" then "  \(.feature): context compacting — may lose coherence"
-    else "  \(.feature): \(.event)"
-    end
-  ) | join("\n")) +
-  "\n--- End Fleet Events ---"' 2>/dev/null)
-
-[ -n "$FORMATTED" ] || exit 0
+OUTPUT=$("$FLEET_BIN" poll 2>/dev/null)
+[ -n "$OUTPUT" ] || exit 0
 
 echo ""
-echo "$FORMATTED"
+echo "$OUTPUT"
 echo ""
