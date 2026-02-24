@@ -17,6 +17,8 @@ const FLEET_DIR = join(HOME, ".claude", "fleet")
 const REGISTRY = join(FLEET_DIR, "registry.json")
 const EVENTS = join(FLEET_DIR, "events.jsonl")
 const REPOS = join(FLEET_DIR, "repos.json")
+const PR_CACHE = join(FLEET_DIR, ".pr_cache.json")
+const PR_CACHE_TTL = 300_000
 
 mkdirSync(FLEET_DIR, { recursive: true })
 if (!existsSync(REGISTRY)) writeFileSync(REGISTRY, JSON.stringify({ version: 1, updated: "", features: {} }))
@@ -105,10 +107,15 @@ async function killFeature(name: string) {
   }
 
   if (branch) {
-    const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
-    if (branchExists.exitCode === 0) {
-      await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
-      console.log(`BRANCH_DELETED: ${branch}`)
+    const protectedBranches = new Set(["main", "master", "develop", "staging", "production"])
+    if (protectedBranches.has(branch)) {
+      console.log(`BRANCH_PROTECTED: ${branch} (not deleted)`)
+    } else {
+      const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
+      if (branchExists.exitCode === 0) {
+        await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
+        console.log(`BRANCH_DELETED: ${branch}`)
+      }
     }
   }
 
@@ -211,6 +218,7 @@ async function checkSessionState(target: string): Promise<string> {
 
 interface Feature {
   description: string
+  title: string
   repo: string
   worktreePath: string | null
   branch: string | null
@@ -224,17 +232,102 @@ interface Feature {
   updatedAt: string
 }
 
-function formatMeta(feat: Feature): string {
-  const parts: string[] = []
-  if (feat.branch) parts.push(`branch=${feat.branch}`)
-  if (feat.pr) {
-    parts.push(`pr=#${feat.pr.number}`)
-    if (feat.pr.ciStatus && feat.pr.ciStatus !== "unknown") parts.push(`ci=${feat.pr.ciStatus}`)
+function generateTitle(prompt: string): string {
+  let text = prompt
+    .replace(/^\/[\w:-]+\s*/, '')
+    .split(/[.\n]/)[0]
+    .trim()
+  text = text.replace(/^(please|can you|could you|i want to|i need to|let's|we need to|we should)\s+/i, '')
+  if (text.length > 60) {
+    text = text.substring(0, 60).replace(/\s+\S*$/, '')
   }
-  if (feat.scope) parts.push(`scope=${feat.scope}`)
-  if (feat.tags?.length > 0) parts.push(`tags=${feat.tags.join(",")}`)
-  return parts.join(" ")
+  if (text.length > 0) {
+    text = text.charAt(0).toUpperCase() + text.slice(1)
+  }
+  return text || prompt.substring(0, 60)
 }
+
+function generateTags(prompt: string): string[] {
+  const text = prompt.replace(/^\/[\w:-]+\s*/, '').toLowerCase()
+    .replace(/n't|'re|'ll|'ve|'s|'d/g, '')
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
+    'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+    'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these',
+    'those', 'it', 'its', 'i', 'we', 'you', 'they', 'he', 'she', 'my',
+    'our', 'your', 'their', 'not', 'no', 'so', 'if', 'then', 'than',
+    'when', 'how', 'what', 'which', 'who', 'all', 'each', 'every', 'both',
+    'few', 'more', 'most', 'other', 'some', 'such', 'only', 'just', 'also',
+    'very', 'please', 'need', 'want', 'let', 'make', 'run', 'use', 'get',
+    'set', 'put', 'take', 'see', 'new', 'first', 'last', 'up', 'out',
+    'as', 'about', 'into', 'through', 'after', 'before', 'any', 'here',
+    'there', 'where', 'why', 'now', 'like', 'using', 'implement',
+    'create', 'add', 'update', 'check', 'look', 'ensure', 'file', 'code',
+    'read', 'write', 'docs', 'plan', 'plans', 'full', 'follow', 'step',
+    'steps', 'below', 'above', 'section', 'part', 'based', 'start',
+  ])
+  const words = text
+    .replace(/[\w.-]+\.\w{2,4}/g, '')
+    .match(/[a-z][a-z0-9-]+/g) ?? []
+  return [...new Set(words.filter(w => w.length >= 3 && w.length <= 20 && !stopWords.has(w)))].slice(0, 8)
+}
+
+interface PrCacheEntry {
+  number: number | null
+  checkedAt: string
+}
+
+function readPrCache(): Record<string, PrCacheEntry> {
+  if (!existsSync(PR_CACHE)) return {}
+  try { return JSON.parse(readFileSync(PR_CACHE, "utf-8")) } catch { return {} }
+}
+
+function writePrCache(cache: Record<string, PrCacheEntry>) {
+  writeFileSync(PR_CACHE, JSON.stringify(cache, null, 2))
+}
+
+async function resolveFeatureBranch(feat: Feature): Promise<string> {
+  if (feat.branch) return feat.branch
+  const workDir = feat.worktreePath && existsSync(feat.worktreePath) ? feat.worktreePath : feat.repo
+  return (await $`git -C ${workDir} branch --show-current`.quiet().nothrow()).text().trim() || "—"
+}
+
+async function resolveFeaturePrDisplay(name: string, feat: Feature): Promise<{ pr: string; ci: string }> {
+  if (feat.pr?.number) {
+    const ci = feat.pr.ciStatus && feat.pr.ciStatus !== "unknown" ? feat.pr.ciStatus : "—"
+    return { pr: `#${feat.pr.number}`, ci }
+  }
+
+  if (!feat.branch) return { pr: "—", ci: "—" }
+
+  const cache = readPrCache()
+  const cacheKey = `${feat.repo}:${feat.branch}`
+  const cached = cache[cacheKey]
+  if (cached && (Date.now() - new Date(cached.checkedAt).getTime()) < PR_CACHE_TTL) {
+    if (cached.number) {
+      updateFeature(name, { pr: { number: cached.number, ciStatus: "unknown", lastChecked: ts() } })
+      return { pr: `#${cached.number}`, ci: "—" }
+    }
+    return { pr: "—", ci: "—" }
+  }
+
+  const result = await $`gh pr view ${feat.branch} --repo ${feat.repo} --json number -q .number`.quiet().nothrow()
+  const num = parseInt(result.text().trim())
+  const prNumber = isNaN(num) ? null : num
+
+  cache[cacheKey] = { number: prNumber, checkedAt: ts() }
+  writePrCache(cache)
+
+  if (prNumber) {
+    updateFeature(name, { pr: { number: prNumber, ciStatus: "unknown", lastChecked: ts() } })
+    return { pr: `#${prNumber}`, ci: "—" }
+  }
+
+  return { pr: "—", ci: "—" }
+}
+
+const STATUS_HEADER = "Name\tState\tRepo\tBranch\tPR\tCI\tTitle"
 
 interface Registry {
   version: number
@@ -256,6 +349,7 @@ fleet.command("spawn")
   .option("--pr <number>", "Associated PR number")
   .option("--scope <scope>", "Session scope: research, implement, or any")
   .option("--tag <tags>", "Comma-separated tags")
+  .option("--title <title>", "Custom title for session picker (auto-generated from prompt if omitted)")
   .action(async (name, repoInput, description, opts) => {
     const repo = resolveRepo(repoInput)
     if (!repo) {
@@ -299,17 +393,27 @@ fleet.command("spawn")
         let defaultBranch = (await $`git -C ${repo} symbolic-ref refs/remotes/origin/HEAD`.quiet().nothrow()).text().trim().replace("refs/remotes/origin/", "")
         if (!defaultBranch) defaultBranch = "main"
         await $`git -C ${repo} fetch origin ${defaultBranch} --quiet`.quiet().nothrow()
+        if (opts.branch) await $`git -C ${repo} fetch origin ${opts.branch} --quiet`.quiet().nothrow()
         mkdirSync(join(repo, ".claude", "worktrees"), { recursive: true })
-        const wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${defaultBranch}`.nothrow()
-        console.log(wt.text())
-        console.log(`WORKTREE_CREATED: ${worktreePath} (branch: ${branch})`)
+        const branchExists = (await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()).exitCode === 0
+        let wt
+        if (branchExists) {
+          wt = await $`git -C ${repo} worktree add ${worktreePath} ${branch}`.nothrow()
+          console.log(wt.text())
+          console.log(`WORKTREE_CREATED: ${worktreePath} (existing branch: ${branch})`)
+        } else {
+          wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${defaultBranch}`.nothrow()
+          console.log(wt.text())
+          console.log(`WORKTREE_CREATED: ${worktreePath} (new branch: ${branch} from origin/${defaultBranch})`)
+        }
       }
       workDir = worktreePath
     }
 
     await $`tmux new-session -d -s ${sessionName} -n claude -c ${workDir}`.quiet()
     await $`tmux set-option -t ${sessionName} @fleet_managed 1`.quiet()
-    if (description) await $`tmux set-option -t ${sessionName} @claude_task ${description}`.quiet()
+    const title = opts.title ?? (description ? generateTitle(description) : name)
+    await $`tmux set-option -t ${sessionName} @claude_task ${title}`.quiet()
 
     await $`tmux new-window -d -t ${sessionName}:2 -n util -c ${repo}`.quiet().nothrow()
     await $`tmux split-window -d -v -t ${sessionName}:2 -c ${repo}`.quiet().nothrow()
@@ -337,10 +441,13 @@ fleet.command("spawn")
     const reg = readRegistry()
     const pr = opts.pr ? { number: parseInt(opts.pr), ciStatus: "unknown", lastChecked: ts() } : null
     const scope = opts.scope ?? null
-    const tags = opts.tag ? opts.tag.split(",").map((t: string) => t.trim()).filter(Boolean) : []
+    const explicitTags = opts.tag ? opts.tag.split(",").map((t: string) => t.trim()).filter(Boolean) : []
+    const autoTags = description ? generateTags(description) : []
+    const tags = [...new Set([...explicitTags, ...autoTags])]
 
     reg.features[name] = {
       description: description ?? "",
+      title,
       repo,
       worktreePath,
       branch,
@@ -356,7 +463,8 @@ fleet.command("spawn")
     reg.updated = ts()
     writeRegistry(reg)
     logEvent(name, "spawned")
-    console.log(`REGISTERED: ${name}`)
+    console.log(`REGISTERED: ${name} (title: ${title})`)
+    if (tags.length > 0) console.log(`TAGS: ${tags.join(", ")}`)
   })
 
 fleet.command("status")
@@ -375,28 +483,29 @@ fleet.command("status")
       return
     }
 
+    const rows: { name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string }[] = []
     for (const [name, feat] of active) {
-      const liveState = await checkSessionState(feat.tmuxSession)
-      const repoName = basename(feat.repo)
-      const meta = formatMeta(feat)
+      const state = await checkSessionState(feat.tmuxSession)
+      const repo = basename(feat.repo)
+      const branch = await resolveFeatureBranch(feat)
+      const prCi = await resolveFeaturePrDisplay(name, feat)
+      const title = feat.title || name
+      rows.push({ name, state, repo, branch, pr: prCi.pr, ci: prCi.ci, title, tmuxTarget: `${feat.tmuxSession}:claude` })
+    }
 
-      console.log(`--- ${name} ---`)
-      console.log(`live=${liveState} repo=${repoName}${meta ? " " + meta : ""}`)
+    console.log(STATUS_HEADER)
+    for (const row of rows) {
+      console.log(`${row.name}\t${row.state}\t${row.repo}\t${row.branch}\t${row.pr}\t${row.ci}\t${row.title}`)
+    }
 
-      if (feat.pr) {
-        const prUrl = feat.pr.url ?? (await $`gh pr view ${feat.pr.number} --repo ${feat.repo} --json url -q .url`.quiet().nothrow()).text().trim()
-        console.log(`pr=#${feat.pr.number} ci=${feat.pr.ciStatus ?? "unknown"} url=${prUrl}`)
-      }
-
-      if (["idle", "blocked", "picker"].includes(liveState)) {
-        const content = (await $`tmux capture-pane -t ${feat.tmuxSession}:claude -p -S -20`.quiet().nothrow()).text().trim()
+    for (const row of rows) {
+      if (["idle", "blocked", "picker"].includes(row.state)) {
+        const content = (await $`tmux capture-pane -t ${row.tmuxTarget} -p -S -20`.quiet().nothrow()).text().trim()
         if (content) {
-          console.log("pane:")
+          console.log(`\nPANE:${row.name}`)
           console.log(content)
         }
       }
-
-      console.log("")
     }
 
     const offsetFile = join(FLEET_DIR, ".events_offset")
@@ -409,7 +518,7 @@ fleet.command("status")
       writeFileSync(offsetFile, String(currentSize))
 
       if (newLines.length > 0) {
-        console.log("--- events ---")
+        console.log("\nEVENTS")
         for (const line of newLines) {
           try {
             const e = JSON.parse(line)
@@ -418,7 +527,6 @@ fleet.command("status")
             console.log(`  ${line}`)
           }
         }
-        console.log("")
       }
     }
   })
@@ -429,11 +537,16 @@ fleet.command("check")
   .action(async (name) => {
     const feat = requireFeature(name)
     const state = await checkSessionState(feat.tmuxSession)
-    const meta = formatMeta(feat)
-    console.log(`FEATURE=${name} STATE=${state}${meta ? " " + meta : ""}`)
+    const repo = basename(feat.repo)
+    const branch = await resolveFeatureBranch(feat)
+    const prCi = await resolveFeaturePrDisplay(name, feat)
+    const title = feat.title || name
+
+    console.log(STATUS_HEADER)
+    console.log(`${name}\t${state}\t${repo}\t${branch}\t${prCi.pr}\t${prCi.ci}\t${title}`)
 
     if (["idle", "working", "blocked", "picker"].includes(state)) {
-      console.log("PANE_OUTPUT:")
+      console.log("\nPANE_OUTPUT:")
       const content = (await $`tmux capture-pane -t ${feat.tmuxSessionId} -p -S -5`.quiet().nothrow()).text()
       console.log(content)
     }
@@ -448,23 +561,34 @@ fleet.command("check-active")
       return
     }
 
-    let found = 0
+    const rows: { name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string }[] = []
     for (const [name, feat] of features) {
       const state = await checkSessionState(feat.tmuxSession)
       if (!["working", "picker", "blocked"].includes(state)) continue
-      found++
-      const repoName = basename(feat.repo)
-      const meta = formatMeta(feat)
-      console.log(`--- ${name} [${state}] repo=${repoName}${meta ? " " + meta : ""} ---`)
-      if (feat.pr) {
-        console.log(`pr=#${feat.pr.number} ci=${feat.pr.ciStatus ?? "unknown"}`)
-      }
-      const content = (await $`tmux capture-pane -t ${feat.tmuxSession}:claude -p -S -20`.quiet().nothrow()).text().trim()
-      if (content) console.log(content)
-      console.log("")
+      const repo = basename(feat.repo)
+      const branch = await resolveFeatureBranch(feat)
+      const prCi = await resolveFeaturePrDisplay(name, feat)
+      const title = feat.title || name
+      rows.push({ name, state, repo, branch, pr: prCi.pr, ci: prCi.ci, title, tmuxTarget: `${feat.tmuxSession}:claude` })
     }
 
-    if (found === 0) console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
+    if (rows.length === 0) {
+      console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
+      return
+    }
+
+    console.log(STATUS_HEADER)
+    for (const row of rows) {
+      console.log(`${row.name}\t${row.state}\t${row.repo}\t${row.branch}\t${row.pr}\t${row.ci}\t${row.title}`)
+    }
+
+    for (const row of rows) {
+      const content = (await $`tmux capture-pane -t ${row.tmuxTarget} -p -S -20`.quiet().nothrow()).text().trim()
+      if (content) {
+        console.log(`\nPANE:${row.name}`)
+        console.log(content)
+      }
+    }
   })
 
 interface CiState {
@@ -1077,7 +1201,8 @@ fleet.command("list")
       const managed = (await $`tmux show-option -qv -t ${sname} @fleet_managed`.quiet().nothrow()).text().trim()
       if (managed === "1") {
         const cmd = await tmuxGet(sname, FMT_CMD)
-        console.log(`ID=${id} NAME=${sname} CMD=${cmd}`)
+        const task = (await $`tmux show-option -qv -t ${sname} @claude_task`.quiet().nothrow()).text().trim()
+        console.log(`ID=${id} NAME=${sname} CMD=${cmd}${task ? " TITLE=" + task : ""}`)
       }
     }
   })
@@ -1139,14 +1264,23 @@ fleet.command("desc")
   .option("--pr <number>", "Set associated PR number")
   .option("--scope <scope>", "Set scope: research, implement, or any")
   .option("--tag <tags>", "Set comma-separated tags")
+  .option("--title <title>", "Set session title for picker display")
   .action(async (name, text, opts) => {
     const feat = requireFeature(name)
     const updates: Partial<Feature> = {}
 
     if (text.length > 0) {
       const desc = text.join(" ")
-      await $`tmux set-option -t ${feat.tmuxSession} @claude_task ${desc}`.quiet().nothrow()
       updates.description = desc
+      if (!opts.title) {
+        updates.title = generateTitle(desc)
+        await $`tmux set-option -t ${feat.tmuxSession} @claude_task ${updates.title}`.quiet().nothrow()
+      }
+    }
+
+    if (opts.title) {
+      updates.title = opts.title
+      await $`tmux set-option -t ${feat.tmuxSession} @claude_task ${opts.title}`.quiet().nothrow()
     }
 
     if (opts.branch) updates.branch = opts.branch
@@ -1155,12 +1289,13 @@ fleet.command("desc")
     if (opts.tag) updates.tags = opts.tag.split(",").map((t: string) => t.trim()).filter(Boolean)
 
     if (Object.keys(updates).length === 0) {
-      console.error("ERROR: Provide description text or metadata flags")
+      console.error("ERROR: Provide description text, --title, or metadata flags")
       process.exit(1)
     }
 
     updateFeature(name, updates)
     const parts: string[] = []
+    if (updates.title) parts.push(`title="${updates.title}"`)
     if (updates.description) parts.push(`desc="${updates.description}"`)
     if (updates.branch) parts.push(`branch=${updates.branch}`)
     if (updates.pr) parts.push(`pr=#${updates.pr.number}`)
