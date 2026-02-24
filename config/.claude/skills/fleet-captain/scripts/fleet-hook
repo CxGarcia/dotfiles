@@ -33,6 +33,8 @@ case "$EVENT" in
     elif echo "$COMMAND" | grep -q 'git push'; then
       BRANCH=$(echo "$COMMAND" | grep -oE '[-a-zA-Z0-9_/]+$')
       echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"pushed\",\"branch\":\"$BRANCH\"}" >> "$EVENTS_FILE"
+    elif echo "$COMMAND" | grep -q 'git commit'; then
+      echo "{\"ts\":\"$TS\",\"feature\":\"$FEATURE\",\"event\":\"committed\"}" >> "$EVENTS_FILE"
     fi
     ;;
 esac
