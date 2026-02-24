@@ -132,9 +132,11 @@ async function checkSessionState(target: string): Promise<string> {
   const title = await tmuxGet(target, "#{pane_title}")
 
   if (title.startsWith("✳")) {
-    const content = (await $`tmux capture-pane -t ${target} -p`.quiet().nothrow()).text().split("\n").slice(-3).join("\n")
+    const lines = (await $`tmux capture-pane -t ${target} -p`.quiet().nothrow()).text().split("\n")
+    const lastNonEmpty = lines.findLastIndex(l => l.trim() !== "")
+    const content = lines.slice(Math.max(0, lastNonEmpty - 4), lastNonEmpty + 1).join("\n")
     if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(content)) return "blocked"
-    if (/Enter to select|Space to select/.test(content)) return "picker"
+    if (/Enter to select|Space to select|to confirm|to navigate/.test(content)) return "picker"
     return "idle"
   }
 
@@ -350,6 +352,17 @@ fleet.command("send")
     const state = await checkSessionState(feat.tmuxSession)
     if (state === "gone" || state === "exited" || state.startsWith("crashed")) {
       console.error(`ERROR: Session is ${state}. Cannot send command.`)
+      process.exit(1)
+    }
+    if (state === "picker") {
+      console.error(`ERROR: Session '${name}' is showing a picker. Sending text would interact with the picker instead of Claude.`)
+      console.error(`  Use 'fleet pick ${name} <number>' to select an option`)
+      console.error(`  Or 'fleet keys ${name} Escape' to dismiss it first`)
+      process.exit(1)
+    }
+    if (state === "blocked") {
+      console.error(`ERROR: Session '${name}' is waiting for confirmation.`)
+      console.error(`  Use 'fleet keys ${name} y' or 'fleet keys ${name} n' to respond`)
       process.exit(1)
     }
     const text = command.join(" ")
