@@ -12,8 +12,11 @@ function tclaude --description "Claude Code workspace with dev layout"
             tmux split-window -d -v -t "$session_name:2" -c $PWD
             tmux set-option -w -t "$session_name:2" monitor-activity off
             tmux select-window -t "$session_name:1"
+            tmux send-keys -t "$session_name:claude" "claude --dangerously-skip-permissions" C-m
+            _tclaude_wait_and_send $session_name /fleet-captain &
+        else
+            _tclaude_ensure_claude $session_name
         end
-        _tclaude_ensure_claude $session_name
         _tclaude_attach $session_name
         return
     end
@@ -47,6 +50,22 @@ function tclaude --description "Claude Code workspace with dev layout"
     end
 
     _tclaude_attach $base_name
+end
+
+function _tclaude_wait_and_send
+    set -l session $argv[1]
+    set -l cmd $argv[2]
+    for i in (seq 1 30)
+        set -l content (tmux capture-pane -t "$session:claude" -p -S -5 2>/dev/null)
+        if string match -q '*❯*' $content; and not string match -qr 'ctrl.c to interrupt|tokens' $content
+            sleep 1
+            tmux send-keys -t "$session:claude" -l $cmd
+            sleep 0.5
+            tmux send-keys -t "$session:claude" Enter
+            return
+        end
+        sleep 2
+    end
 end
 
 function _tclaude_ensure_claude
