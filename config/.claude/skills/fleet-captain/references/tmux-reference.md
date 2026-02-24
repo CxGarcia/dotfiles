@@ -7,9 +7,10 @@ Low-level tmux commands used by `fleet` scripts. The orchestrator should use `fl
 | Check | Command | Result |
 |-------|---------|--------|
 | Claude running? | `tmux display-message -t "$id" -p '#{pane_current_command}'` | `claude` = yes, `fish`/`bash` = exited |
-| Claude idle? | `tmux capture-pane -t "$id" -p -S -5` | Has `❯` and no `ctrl+c to interrupt` or `·.*tokens` |
-| Claude working? | Same capture | Matches `ctrl\+c to interrupt`, `·.*tokens`, `Thinking`, or `Running` |
-| Blocked? | Same capture | Matches `\[y/n\]`, `\[Y/n\]`, or `\[yes/no\]` |
+| Claude idle? | `pane_title` starts with `✳` + no picker/blocked patterns in last non-empty lines | Idle, waiting for input |
+| Claude working? | `pane_title` does not start with `✳` | Actively processing |
+| Blocked? | `pane_title` starts with `✳` + last non-empty lines match `\[y/n\]`, `\[Y/n\]`, or `\[yes/no\]` | Waiting for confirmation |
+| Picker? | `pane_title` starts with `✳` + last non-empty lines match `Enter to select`, `Space to select`, `to confirm`, or `to navigate` | Showing a selection menu |
 | Exited? | `tmux display-message -t "$id" -p '#{pane_dead}'` | `1` = dead; check `#{pane_dead_status}` for exit code |
 
 ## Sending Commands

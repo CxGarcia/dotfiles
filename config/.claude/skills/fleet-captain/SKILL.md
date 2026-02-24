@@ -47,7 +47,7 @@ To have a session follow a workflow, include it in the prompt: `fleet spawn sso-
 
 `fleet status` shows live state (working, idle, blocked, picker, gone, exited, crashed), pane output for idle/blocked/picker sessions, and pending events.
 
-`fleet send` works regardless of session state -- if busy, the text queues until the current turn finishes.
+`fleet send` delivers text to the Claude input prompt. If the session is busy (working), the text queues until the current turn finishes. If the session is showing a picker or confirmation prompt, `send` refuses and tells you to use `fleet pick` or `fleet keys` instead -- this prevents accidentally interacting with picker UIs.
 
 ## Killing
 
