@@ -252,13 +252,17 @@ async function checkSessionState(target: string, captureLines = 20): Promise<{ s
   // Blocked: y/n confirmation prompt (check tail)
   if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(tail)) return { state: "blocked", content }
 
-  // Picker: interactive selection UI (check full range — pickers can be tall)
-  if (/Enter to select|Enter to confirm|Space to select|to navigate/.test(content)) return { state: "picker", content }
+  // Picker: interactive selection UI (check tail — "Enter to select" is always
+  // near the bottom when a real picker is active; checking full content would
+  // false-positive on fleet output that includes other sessions' picker text)
+  if (/Enter to select|Enter to confirm|Space to select|to navigate/.test(tail)) return { state: "picker", content }
 
   // If pane_title says idle, check for unsubmitted text in the input buffer
+  // The ❯ prompt line isn't always the very last line — Claude Code renders
+  // separator and mode-indicator lines below it, so check the tail per-line
   if (title.startsWith("✳")) {
-    const lastLine = lines[lines.length - 1] ?? ""
-    if (/❯\s*\S/.test(lastLine)) return { state: "buffer", content }
+    const hasBuffer = lines.slice(-5).some(l => /^\s*❯\s+\S/.test(l))
+    if (hasBuffer) return { state: "buffer", content }
     return { state: "idle", content }
   }
 
