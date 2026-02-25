@@ -24,17 +24,17 @@ Fan-out N sessions across subsystems for codebase-wide review, simplification, o
 ```
 Deep code review of the {{subsystem}} layer.
 
-SCOPE: {{scope_paths}}
+Scope: {{scope_paths}}
 
-WHAT TO LOOK FOR: redundant code, dead code, untested code, convention violations, missing error handling, inconsistent patterns.
+What to look for: redundant code, dead code, untested code, convention violations, missing error handling, inconsistent patterns.
 
-PROCESS:
+Process:
 1. Read every file in scope.
 2. Create a findings document summarizing issues found.
 3. Fix all issues found.
 4. Run tests to verify fixes don't break anything.
 5. Commit, push to branch worktree-review-{{subsystem}}, and create a PR to main.
-6. After pushing, run `gh pr checks` to monitor CI and fix any failures.
+6. After pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix and push again. Do not go idle until all checks pass.
 ```
 
 ### Simplify audit
@@ -51,7 +51,7 @@ After the loop completes:
 2. Push to branch worktree-simplify-{{subsystem}}.
 3. Create a PR to main.
 4. Enable auto-merge: gh pr merge --auto --squash <PR_NUMBER>
-5. Run `gh pr checks` to monitor CI and fix any failures.
+5. Run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix and push again. Do not go idle until all checks pass.
 ```
 
 ### Test audit
@@ -59,14 +59,14 @@ After the loop completes:
 ```
 Write deep integration tests for the {{subsystem}} layer.
 
-SCOPE: {{scope_paths}}
+Scope: {{scope_paths}}
 
 Cover the full surface: happy paths, error paths, edge cases. Prefer few deep tests over many shallow ones. Test against real dependencies where possible (local DB, docker services).
 
 After writing tests:
 1. Run the full test suite to verify everything passes.
 2. Commit, push to branch worktree-test-{{subsystem}}, and create a PR to main.
-3. After pushing, run `gh pr checks` to monitor CI and fix any failures.
+3. After pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix and push again. Do not go idle until all checks pass.
 ```
 
 ## Fan-out Procedure
@@ -89,7 +89,7 @@ Tag all audit sessions with `audit` and the audit type for filtering: `fleet sta
 
 | Signal | Meaning | Action |
 |--------|---------|--------|
-| All sessions idle with PRs | Audit complete | Report: "N/N audit sessions have PRs." Kill sessions |
-| `context_warning` on a session | Session compacting (common for review/simplify loops) | Kill and respawn with `--branch` to continue from existing commits |
+| All sessions idle with PRs | Audit complete | Report: "N/N audit sessions have PRs." Recommend killing the sessions |
+| `context_warning` on a session | Session compacting (common for review/simplify loops) | Recommend killing and respawning with `--branch` to continue from existing commits |
 | Session idle without PR | Session may be stuck or finished without creating PR | `fleet check`, nudge with `fleet send` |
-| CI failing on audit PR | Audit introduced a regression | `fleet send` with fix instruction, or kill and respawn |
+| CI failing on audit PR | Audit introduced a regression | `fleet send` with fix instruction, or recommend killing and respawning |

@@ -140,7 +140,7 @@ When in doubt, ask the user via AskUserQuestion. When clear, just do it.
 
 ## Branching Strategy
 
-**This is the most critical section. Branch mismanagement is the #1 cause of fleet failures.** Sessions pushing to wrong branches, basing work on stale code, or mixing changes across PRs causes real damage. Follow these rules exactly.
+Branch mismanagement is the #1 cause of fleet failures. Sessions pushing to wrong branches, basing work on stale code, or mixing changes across PRs causes real damage.
 
 ### Rule 1: Use `--worktree` for any session that creates commits
 
@@ -163,7 +163,7 @@ fleet spawn investigate app "Read the auth module and explain how token refresh 
 
 ### Rule 2: One branch per session, one PR per branch, one concern per PR
 
-Never let a session push changes to a branch that belongs to another session or a different concern. Each spawn creates a branch named `worktree-<name>` by default. This is the session's branch. Period.
+Never let a session push changes to a branch that belongs to another session or a different concern. Each spawn creates a branch named `worktree-<name>` by default — that is the session's branch.
 
 When a session creates a PR, immediately bind it:
 ```bash
@@ -215,16 +215,6 @@ Before spawning, ask yourself:
 | Follow-up after merged PR | `--worktree` with a new name (creates fresh branch; do not reuse the merged branch name) |
 | Research / read-only | No worktree, add `--scope research` |
 | Quick fix on existing branch | `--worktree --branch <branch>` |
-
-### Failure modes and prevention
-
-| Failure | Cause | Prevention |
-|---------|-------|------------|
-| Worktree based on stale main | Spawned without `--worktree` | Always use `--worktree` for commit work — it auto-fetches |
-| Session pushed to merged PR's branch | Session reused old branch name | Spawn with `--worktree` (new branch name). Explicitly say "create a fresh branch" in prompt |
-| Session on wrong branch | Spawned without worktree, inherited repo's checked-out branch | Always use `--worktree` for isolation |
-| Changes pushed to wrong branch | Session lost track of its branch after multiple instructions | Include branch name in every git-related `fleet send` |
-| Two sessions conflict on same branch | Both spawned without worktrees in same repo | One worktree per session. Never share branches between sessions |
 
 ## Monitoring
 
@@ -279,13 +269,11 @@ Session is waiting for y/n:
 Session is doing the wrong thing or going off-track:
 1. `fleet send <name> "Stop — <correction>"` — redirect if it's idle
 2. If it's working and ignoring you, `fleet keys <name> C-c` to interrupt, then send correction
-3. If unrecoverable, recommend killing to the user — get their approval first. Suggest: "Session <name> seems unrecoverable. Want me to kill it and respawn with a better prompt?"
+3. If unrecoverable, recommend killing and respawning with a better prompt
 
 ### CI failures
 
-Feature sessions should monitor their own CI (see Spawning, item 4). The captain does not poll CI — sessions self-report failures via hooks, and fix them autonomously.
-
-If a session went idle with failing CI (it should have been watching with `gh pr checks --watch`):
+Sessions own their CI (see Spawning, item 4). They watch checks with `gh pr checks --watch` and fix failures autonomously. The captain only intervenes as a fallback when a session goes idle with failing CI:
 1. `fleet pr <name> --once` — check which checks failed
 2. `fleet send <name> "CI is failing on <check>. Fix it, push to branch <branch>, and run 'gh pr checks <number> --watch' to confirm all checks pass before going idle."`
 3. If the PR belongs to someone else, just report to the user
@@ -295,11 +283,11 @@ If a session went idle with failing CI (it should have been watching with `gh pr
 A `context_warning` event means the session is compacting context. It may lose coherence. Watch for:
 - Repeated actions (doing work it already did)
 - Forgetting the original task
-- If it degrades, recommend killing to the user — get approval before killing, then respawn with a fresh prompt that includes the progress so far
+- If it degrades, consider killing and respawning with a fresh prompt that includes the progress so far
 
 ### Crashed/gone sessions
 
-1. Show the user which sessions are gone/crashed and **ask before cleaning up** — do not run `fleet kill --gone` without approval
+1. Report which sessions are gone/crashed
 2. Decide whether to respawn based on whether the work was committed/pushed
 3. If the branch has commits, respawn with `--branch` to continue from where it left off
 
