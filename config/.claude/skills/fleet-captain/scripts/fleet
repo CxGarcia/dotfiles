@@ -11,6 +11,8 @@ const FMT_DEAD = "#{pane_dead}"
 const FMT_DEAD_STATUS = "#{pane_dead_status}"
 const FMT_SESSION_ID = "#{session_id}"
 const FMT_SESSIONS = "#{session_id} #{session_name}"
+const SEP = "\x1f"
+const FMT_STATE = `#{pane_current_command}${SEP}#{pane_dead}${SEP}#{pane_dead_status}${SEP}#{pane_title}`
 
 const HOME = homedir()
 const FLEET_DIR = join(HOME, ".claude", "fleet")
@@ -199,32 +201,30 @@ async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
   return false
 }
 
-async function checkSessionState(target: string): Promise<string> {
-  if (!await sessionExists(target)) return "gone"
+async function checkSessionState(target: string, captureLines = 5): Promise<{ state: string; content: string | null }> {
+  const result = await $`tmux display-message -t ${target} -p ${FMT_STATE}`.quiet().nothrow()
+  if (result.exitCode !== 0) return { state: "gone", content: null }
 
-  const cmd = await tmuxGet(target, FMT_CMD)
+  const [cmd, dead, deadStatus, title] = result.text().trim().split(SEP)
 
   if (cmd !== "claude") {
-    const dead = await tmuxGet(target, FMT_DEAD)
     if (dead === "1") {
-      const code = await tmuxGet(target, FMT_DEAD_STATUS)
-      return code === "0" ? "exited" : `crashed:${code}`
+      return { state: deadStatus === "0" ? "exited" : `crashed:${deadStatus}`, content: null }
     }
-    return "exited"
+    return { state: "exited", content: null }
   }
-
-  const title = await tmuxGet(target, "#{pane_title}")
 
   if (title.startsWith("✳")) {
     const lines = (await $`tmux capture-pane -t ${target} -p`.quiet().nothrow()).text().split("\n")
     const lastNonEmpty = lines.findLastIndex(l => l.trim() !== "")
-    const content = lines.slice(Math.max(0, lastNonEmpty - 4), lastNonEmpty + 1).join("\n")
-    if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(content)) return "blocked"
-    if (/Enter to select|Space to select|to confirm|to navigate/.test(content)) return "picker"
-    return "idle"
+    const content = lines.slice(Math.max(0, lastNonEmpty - (captureLines - 1)), lastNonEmpty + 1).join("\n")
+    const stateContent = lines.slice(Math.max(0, lastNonEmpty - 4), lastNonEmpty + 1).join("\n")
+    if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(stateContent)) return { state: "blocked", content }
+    if (/Enter to select|Space to select|to confirm|to navigate/.test(stateContent)) return { state: "picker", content }
+    return { state: "idle", content }
   }
 
-  return "working"
+  return { state: "working", content: null }
 }
 
 interface Feature {
@@ -304,7 +304,7 @@ async function resolveFeatureBranch(feat: Feature): Promise<string> {
   return (await $`git -C ${workDir} branch --show-current`.quiet().nothrow()).text().trim() || "—"
 }
 
-async function resolveFeaturePrDisplay(name: string, feat: Feature): Promise<{ pr: string; ci: string }> {
+async function resolveFeaturePrDisplay(name: string, feat: Feature, prCache?: Record<string, PrCacheEntry>): Promise<{ pr: string; ci: string; discoveredPrNumber?: number }> {
   if (feat.pr?.number) {
     const ci = feat.pr.ciStatus && feat.pr.ciStatus !== "unknown" ? feat.pr.ciStatus : "—"
     return { pr: `#${feat.pr.number}`, ci }
@@ -312,13 +312,12 @@ async function resolveFeaturePrDisplay(name: string, feat: Feature): Promise<{ p
 
   if (!feat.branch) return { pr: "—", ci: "—" }
 
-  const cache = readPrCache()
+  const cache = prCache ?? readPrCache()
   const cacheKey = `${feat.repo}:${feat.branch}`
   const cached = cache[cacheKey]
   if (cached && (Date.now() - new Date(cached.checkedAt).getTime()) < PR_CACHE_TTL) {
     if (cached.number) {
-      updateFeature(name, { pr: { number: cached.number, ciStatus: "unknown", lastChecked: ts() } })
-      return { pr: `#${cached.number}`, ci: "—" }
+      return { pr: `#${cached.number}`, ci: "—", discoveredPrNumber: cached.number }
     }
     return { pr: "—", ci: "—" }
   }
@@ -328,11 +327,10 @@ async function resolveFeaturePrDisplay(name: string, feat: Feature): Promise<{ p
   const prNumber = isNaN(num) ? null : num
 
   cache[cacheKey] = { number: prNumber, checkedAt: ts() }
-  writePrCache(cache)
+  if (!prCache) writePrCache(cache)
 
   if (prNumber) {
-    updateFeature(name, { pr: { number: prNumber, ciStatus: "unknown", lastChecked: ts() } })
-    return { pr: `#${prNumber}`, ci: "—" }
+    return { pr: `#${prNumber}`, ci: "—", discoveredPrNumber: prNumber }
   }
 
   return { pr: "—", ci: "—" }
@@ -494,15 +492,33 @@ fleet.command("status")
       return
     }
 
-    const rows: { name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string }[] = []
-    for (const [name, feat] of active) {
-      const state = await checkSessionState(feat.tmuxSession)
-      const repo = basename(feat.repo)
-      const branch = await resolveFeatureBranch(feat)
-      const prCi = await resolveFeaturePrDisplay(name, feat)
-      const title = feat.title || name
-      rows.push({ name, state, repo, branch, pr: prCi.pr, ci: prCi.ci, title, tmuxTarget: `${feat.tmuxSession}:claude` })
+    const prCache = readPrCache()
+    const results = await Promise.allSettled(
+      active.map(async ([name, feat]) => {
+        const [stateResult, branch, prCi] = await Promise.all([
+          checkSessionState(feat.tmuxSession, 20),
+          resolveFeatureBranch(feat),
+          resolveFeaturePrDisplay(name, feat, prCache),
+        ])
+        return {
+          name, state: stateResult.state, repo: basename(feat.repo), branch,
+          pr: prCi.pr, ci: prCi.ci, title: feat.title || name,
+          tmuxTarget: `${feat.tmuxSession}:claude`, paneContent: stateResult.content,
+          discoveredPrNumber: prCi.discoveredPrNumber,
+        }
+      })
+    )
+
+    const rows = results
+      .filter((r): r is PromiseFulfilledResult<{ name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string; paneContent: string | null; discoveredPrNumber?: number }> => r.status === "fulfilled")
+      .map(r => r.value)
+
+    for (const row of rows) {
+      if (row.discoveredPrNumber) {
+        updateFeature(row.name, { pr: { number: row.discoveredPrNumber, ciStatus: "unknown", lastChecked: ts() } })
+      }
     }
+    writePrCache(prCache)
 
     console.log(STATUS_HEADER)
     for (const row of rows) {
@@ -510,12 +526,9 @@ fleet.command("status")
     }
 
     for (const row of rows) {
-      if (["idle", "blocked", "picker"].includes(row.state)) {
-        const content = (await $`tmux capture-pane -t ${row.tmuxTarget} -p -S -20`.quiet().nothrow()).text().trim()
-        if (content) {
-          console.log(`\nPANE:${row.name}`)
-          console.log(content)
-        }
+      if (["idle", "blocked", "picker"].includes(row.state) && row.paneContent) {
+        console.log(`\nPANE:${row.name}`)
+        console.log(row.paneContent)
       }
     }
 
@@ -547,18 +560,21 @@ fleet.command("check")
   .argument("<name>", "Feature name")
   .action(async (name) => {
     const feat = requireFeature(name)
-    const state = await checkSessionState(feat.tmuxSession)
+    const { state, content: paneContent } = await checkSessionState(feat.tmuxSession, 20)
     const repo = basename(feat.repo)
     const branch = await resolveFeatureBranch(feat)
     const prCi = await resolveFeaturePrDisplay(name, feat)
     const title = feat.title || name
+    if (prCi.discoveredPrNumber) {
+      updateFeature(name, { pr: { number: prCi.discoveredPrNumber, ciStatus: "unknown", lastChecked: ts() } })
+    }
 
     console.log(STATUS_HEADER)
     console.log(`${name}\t${state}\t${repo}\t${branch}\t${prCi.pr}\t${prCi.ci}\t${title}`)
 
     if (["idle", "working", "blocked", "picker"].includes(state)) {
       console.log("\nPANE_OUTPUT:")
-      const content = (await $`tmux capture-pane -t ${feat.tmuxSessionId} -p -S -5`.quiet().nothrow()).text()
+      const content = paneContent ?? (await $`tmux capture-pane -t ${feat.tmuxSessionId} -p -S -5`.quiet().nothrow()).text()
       console.log(content)
     }
   })
@@ -572,16 +588,35 @@ fleet.command("check-active")
       return
     }
 
-    const rows: { name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string }[] = []
-    for (const [name, feat] of features) {
-      const state = await checkSessionState(feat.tmuxSession)
-      if (!["working", "picker", "blocked"].includes(state)) continue
-      const repo = basename(feat.repo)
-      const branch = await resolveFeatureBranch(feat)
-      const prCi = await resolveFeaturePrDisplay(name, feat)
-      const title = feat.title || name
-      rows.push({ name, state, repo, branch, pr: prCi.pr, ci: prCi.ci, title, tmuxTarget: `${feat.tmuxSession}:claude` })
+    const prCache = readPrCache()
+    const results = await Promise.allSettled(
+      features.map(async ([name, feat]) => {
+        const [stateResult, branch, prCi] = await Promise.all([
+          checkSessionState(feat.tmuxSession, 20),
+          resolveFeatureBranch(feat),
+          resolveFeaturePrDisplay(name, feat, prCache),
+        ])
+        return {
+          name, state: stateResult.state, repo: basename(feat.repo), branch,
+          pr: prCi.pr, ci: prCi.ci, title: feat.title || name,
+          tmuxTarget: `${feat.tmuxSession}:claude`, paneContent: stateResult.content,
+          discoveredPrNumber: prCi.discoveredPrNumber,
+        }
+      })
+    )
+
+    const allRows = results
+      .filter((r): r is PromiseFulfilledResult<{ name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string; paneContent: string | null; discoveredPrNumber?: number }> => r.status === "fulfilled")
+      .map(r => r.value)
+
+    for (const row of allRows) {
+      if (row.discoveredPrNumber) {
+        updateFeature(row.name, { pr: { number: row.discoveredPrNumber, ciStatus: "unknown", lastChecked: ts() } })
+      }
     }
+    writePrCache(prCache)
+
+    const rows = allRows.filter(r => ["working", "picker", "blocked"].includes(r.state))
 
     if (rows.length === 0) {
       console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
@@ -594,10 +629,9 @@ fleet.command("check-active")
     }
 
     for (const row of rows) {
-      const content = (await $`tmux capture-pane -t ${row.tmuxTarget} -p -S -20`.quiet().nothrow()).text().trim()
-      if (content) {
+      if (row.paneContent) {
         console.log(`\nPANE:${row.name}`)
-        console.log(content)
+        console.log(row.paneContent)
       }
     }
   })
@@ -632,10 +666,16 @@ function writeCiState(name: string, state: CiState) {
   writeFileSync(ciStateFile(name), JSON.stringify(state, null, 2))
 }
 
+const ownerRepoCache = new Map<string, string>()
+
 async function getOwnerRepo(repoPath: string): Promise<string> {
+  const cached = ownerRepoCache.get(repoPath)
+  if (cached !== undefined) return cached
   const remote = (await $`git -C ${repoPath} remote get-url origin`.quiet().nothrow()).text().trim()
   const match = remote.match(/github\.com[:/](.+?)(?:\.git)?$/)
-  return match ? match[1] : ""
+  const result = match ? match[1] : ""
+  ownerRepoCache.set(repoPath, result)
+  return result
 }
 
 async function resolvePrNumber(feat: Feature): Promise<number | null> {
@@ -781,8 +821,11 @@ fleet.command("watch")
     }
 
     const snapshot: Record<string, string> = {}
-    for (const [name, feat] of features) {
-      snapshot[name] = await checkSessionState(feat.tmuxSession)
+    const initialStates = await Promise.allSettled(
+      features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+    )
+    for (const r of initialStates) {
+      if (r.status === "fulfilled") snapshot[r.value.name] = r.value.state
     }
 
     const offsetFile = join(FLEET_DIR, ".events_offset")
@@ -816,8 +859,12 @@ fleet.command("watch")
     }
 
     async function collectStateChanges() {
-      for (const [name, feat] of features) {
-        const current = await checkSessionState(feat.tmuxSession)
+      const states = await Promise.allSettled(
+        features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+      )
+      for (const r of states) {
+        if (r.status !== "fulfilled") continue
+        const { name, state: current } = r.value
         const previous = snapshot[name]
         if (current !== previous) {
           collected.push({
@@ -1037,8 +1084,12 @@ fleet.command("poll")
     }
 
     const newSnapshot: Record<string, string> = {}
-    for (const [name, feat] of features) {
-      const current = await checkSessionState(feat.tmuxSession)
+    const pollStates = await Promise.allSettled(
+      features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+    )
+    for (const r of pollStates) {
+      if (r.status !== "fulfilled") continue
+      const { name, state: current } = r.value
       newSnapshot[name] = current
       const previous = snapshot[name]
       if (previous && previous !== current) {
@@ -1066,7 +1117,7 @@ fleet.command("send")
   .argument("<command...>", "Command text to send")
   .action(async (name, command) => {
     const feat = requireFeature(name)
-    const state = await checkSessionState(feat.tmuxSession)
+    const { state } = await checkSessionState(feat.tmuxSession)
     if (state === "gone" || state === "exited" || state.startsWith("crashed")) {
       console.error(`ERROR: Session is ${state}. Cannot send command.`)
       process.exit(1)
@@ -1106,7 +1157,7 @@ fleet.command("send-multi")
         console.log(`SKIP: ${name} not found`)
         continue
       }
-      const state = await checkSessionState(feat.tmuxSession)
+      const { state } = await checkSessionState(feat.tmuxSession)
       if (["gone", "exited"].includes(state) || state.startsWith("crashed")) {
         console.log(`SKIP: ${name} is ${state}`)
         continue
@@ -1134,7 +1185,7 @@ fleet.command("pick")
       process.exit(1)
     }
     const feat = requireFeature(name)
-    const state = await checkSessionState(feat.tmuxSession)
+    const { state } = await checkSessionState(feat.tmuxSession)
     if (state !== "picker") {
       console.error(`ERROR: Session is not showing a picker (state: ${state}).`)
       console.error(`  Use 'fleet check ${name}' to see the current pane output.`)
@@ -1168,7 +1219,7 @@ fleet.command("kill")
       targets = activeFeatures().map(([n]) => n)
     } else if (opts.idle || opts.gone) {
       for (const [name, feat] of activeFeatures()) {
-        const state = await checkSessionState(feat.tmuxSession)
+        const { state } = await checkSessionState(feat.tmuxSession)
         if (opts.idle && state === "idle") targets.push(name)
         if (opts.gone && (["gone", "exited"].includes(state) || state.startsWith("crashed"))) targets.push(name)
       }
@@ -1204,17 +1255,15 @@ fleet.command("kill")
 fleet.command("list")
   .description("List fleet-managed tmux sessions")
   .action(async () => {
-    const sessions = (await $`tmux list-sessions -F ${FMT_SESSIONS}`.quiet().nothrow()).text().trim()
+    const fmt = "#{session_id} #{session_name} #{@fleet_managed} #{pane_current_command} #{@claude_task}"
+    const sessions = (await $`tmux list-sessions -F ${fmt}`.quiet().nothrow()).text().trim()
     if (!sessions) return
 
     for (const line of sessions.split("\n")) {
-      const [id, sname] = line.split(" ")
-      const managed = (await $`tmux show-option -qv -t ${sname} @fleet_managed`.quiet().nothrow()).text().trim()
-      if (managed === "1") {
-        const cmd = await tmuxGet(sname, FMT_CMD)
-        const task = (await $`tmux show-option -qv -t ${sname} @claude_task`.quiet().nothrow()).text().trim()
-        console.log(`ID=${id} NAME=${sname} CMD=${cmd}${task ? " TITLE=" + task : ""}`)
-      }
+      const [id, sname, managed, cmd, ...taskParts] = line.split(" ")
+      if (managed !== "1") continue
+      const task = taskParts.join(" ").trim()
+      console.log(`ID=${id} NAME=${sname} CMD=${cmd}${task ? " TITLE=" + task : ""}`)
     }
   })
 
@@ -1480,13 +1529,13 @@ fleet.command("relay")
     const toFeat = requireFeature(to)
     const lines = parseInt(opts.lines)
 
-    const fromState = await checkSessionState(fromFeat.tmuxSession)
+    const { state: fromState } = await checkSessionState(fromFeat.tmuxSession)
     if (fromState === "gone" || fromState === "exited" || fromState.startsWith("crashed")) {
       console.error(`ERROR: Source session '${from}' is ${fromState}`)
       process.exit(1)
     }
 
-    const toState = await checkSessionState(toFeat.tmuxSession)
+    const { state: toState } = await checkSessionState(toFeat.tmuxSession)
     if (toState === "gone" || toState === "exited" || toState.startsWith("crashed")) {
       console.error(`ERROR: Target session '${to}' is ${toState}`)
       process.exit(1)
@@ -1540,7 +1589,7 @@ fleet.command("share")
         console.log(`SKIP: ${name} not found`)
         continue
       }
-      const state = await checkSessionState(feat.tmuxSession)
+      const { state } = await checkSessionState(feat.tmuxSession)
       if (["gone", "exited"].includes(state) || state.startsWith("crashed")) {
         console.log(`SKIP: ${name} is ${state}`)
         continue
