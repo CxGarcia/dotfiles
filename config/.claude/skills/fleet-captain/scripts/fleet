@@ -158,11 +158,23 @@ async function tmuxGet(target: string, fmt: string): Promise<string> {
   return (await $`tmux display-message -t ${target} -p ${fmt}`.quiet().nothrow()).text().trim()
 }
 
+async function waitForPaneContent(target: string, pattern: string, maxWait = 10): Promise<boolean> {
+  const fmt = `#{C/r:${pattern}}`
+  for (let elapsed = 0; elapsed < maxWait * 1000; elapsed += 200) {
+    const line = (await $`tmux display-message -t ${target} -p ${fmt}`.quiet().nothrow()).text().trim()
+    if (line !== "0") return true
+    await Bun.sleep(200)
+  }
+  return false
+}
+
 async function tmuxSend(session: string, text: string) {
-  await $`tmux send-keys -t ${session}:claude C-u`.quiet()
-  await $`tmux send-keys -t ${session}:claude -l ${text}`.quiet()
-  await Bun.sleep(1000)
-  await $`tmux send-keys -t ${session}:claude Enter`.quiet()
+  const target = `${session}:claude`
+  await $`tmux send-keys -t ${target} C-u`.quiet()
+  await $`tmux send-keys -t ${target} -l ${text}`.quiet()
+  const probe = text.slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  await waitForPaneContent(target, probe, 10)
+  await $`tmux send-keys -t ${target} Enter`.quiet()
 }
 
 async function sessionExists(target: string): Promise<boolean> {
@@ -172,18 +184,17 @@ async function sessionExists(target: string): Promise<boolean> {
 
 async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
   const target = `${session}:claude`
-  for (let elapsed = 0; elapsed < maxWait; elapsed += 2) {
+  for (let elapsed = 0; elapsed < maxWait * 1000; elapsed += 500) {
     const cmd = await tmuxGet(target, FMT_CMD)
     if (cmd === "claude") {
+      const title = await tmuxGet(target, "#{pane_title}")
+      if (title.startsWith("✳")) return true
       const content = (await $`tmux capture-pane -t ${target} -p -S -5`.quiet().nothrow()).text()
       const hasPrompt = content.includes("❯")
       const hasSpinner = /ctrl.c to interrupt|tokens/.test(content)
-      if (hasPrompt && !hasSpinner) {
-        await Bun.sleep(2000)
-        return true
-      }
+      if (hasPrompt && !hasSpinner) return true
     }
-    await Bun.sleep(2000)
+    await Bun.sleep(500)
   }
   return false
 }
