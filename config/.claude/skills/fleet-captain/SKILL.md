@@ -104,7 +104,7 @@ Before spawning, think through the work:
    - `--scope implement` — Building and coding.
    - `--scope any` — No constraints (default).
 
-4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include "after pushing, run `gh pr checks` to monitor CI and fix any failures" in the prompt. The captain does not poll CI — sessions self-monitor and self-heal.
+4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include these instructions in the prompt: "after pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix the issue and push again. Do not go idle until all checks pass." The captain does not poll CI — sessions self-monitor and self-heal.
 
 ## Workflows
 
@@ -285,9 +285,9 @@ Session is doing the wrong thing or going off-track:
 
 Feature sessions should monitor their own CI (see Spawning, item 4). The captain does not poll CI — sessions self-report failures via hooks, and fix them autonomously.
 
-If a session misses a CI failure (e.g., it went idle without noticing):
+If a session went idle with failing CI (it should have been watching with `gh pr checks --watch`):
 1. `fleet pr <name> --once` — check which checks failed
-2. `fleet send <name> "CI is failing on <check>. Fix it and push to branch <branch>."`
+2. `fleet send <name> "CI is failing on <check>. Fix it, push to branch <branch>, and run 'gh pr checks <number> --watch' to confirm all checks pass before going idle."`
 3. If the PR belongs to someone else, just report to the user
 
 ### Context warnings
