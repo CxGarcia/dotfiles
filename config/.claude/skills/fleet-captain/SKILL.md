@@ -24,14 +24,16 @@ Idle sessions are normal. Silence is not failure.
 
 ## Captain's Loop
 
-Every turn follows this cycle:
+The captain always has a background watch running. This is the core monitoring loop:
 
-1. **Read events** — "Fleet Events" arrive automatically via the UserPromptSubmit hook. Classify by priority (P0/P1/P2).
-2. **Synthesize** — Report fleet state to the user in one concise line. Lead with what needs attention.
-3. **Act** — Handle P0 items immediately (pickers, blockers, CI failures). Queue P1 items for the user to decide on. Mention P2 items only if relevant.
-4. **Watch** — Run `fleet watch --timeout 120` in the background to catch pickers, blockers, and state changes between user messages. When watch returns events, act on P0 items immediately. The hook still delivers events on each user message, but background watch catches time-sensitive items (stuck pickers, crashed sessions) without waiting for the user.
+1. **Start watch** — Run `fleet watch --timeout 120 --interval 5` with `run_in_background=true`. Always have exactly one watch running.
+2. **Read events** — When the watch completes (events detected or timeout), read the output. Also read "Fleet Events" from the UserPromptSubmit hook when the user sends a message. Classify all events by priority (P0/P1/P2).
+3. **Act** — Handle P0 items immediately: check pane content with `fleet check <name>`, then `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
+4. **Restart watch** — Immediately start a new background watch after handling events. The captain is never without a watch running.
 
 When there are no events, just respond to the user normally. Don't announce "no fleet activity" unless asked.
+
+The hook delivers events on each user message, but the background watch is the primary monitoring mechanism — it catches pickers and state changes proactively without waiting for user input.
 
 ## CLI Reference
 
@@ -218,11 +220,12 @@ Before spawning, ask yourself:
 
 ## Monitoring
 
-Events arrive automatically via the UserPromptSubmit hook (see Captain's Loop). Use manual commands only when you need a deeper look:
+The background watch (see Captain's Loop) is the primary monitoring mechanism. The UserPromptSubmit hook also delivers events on each user message as a secondary channel. Use manual commands when you need a deeper look:
 
-- `fleet status` — full snapshot with pane output. Use `--tag` or `--scope` to filter.
+- `fleet status` — full snapshot with pane output for all sessions. Use `--tag` or `--scope` to filter.
+- `fleet check <name>` — detailed state + 20-line pane output for one session. Use after watch reports a state change to see what's happening.
 - `fleet check-active` — only working/picker/blocked/buffer sessions with 5-line pane excerpts. Faster when you just need sessions needing attention.
-- `fleet watch --timeout 120` — blocks until events occur or timeout expires. Run in the background between user messages to catch pickers and state changes proactively.
+- `fleet watch --timeout 120 --interval 5` — blocks until events occur or timeout expires. Always run this in the background with `run_in_background=true`. Restart immediately after it completes.
 
 ## Interaction
 
