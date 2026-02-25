@@ -10,7 +10,8 @@ Autonomous pipeline for building features. A single session advances through pha
 | plan | `/workflows:plan` — designs how to build it | `docs/plans/YYYY-MM-DD-<type>-<topic>-plan.md` | work |
 | work | `/workflows:work` with swarm — implements | Code changes on branch | review |
 | review | `/workflows:review` against plan/brainstorm — verifies correctness, quality, and cleanliness | Findings in `todos/`, auto-fixed divergences | resolve |
-| resolve | Address all review findings using subagents | Clean, verified code | pr |
+| resolve | Address all review findings using subagents | Fixed code | verify |
+| verify | Run tests, typecheck, build — confirm resolve didn't break anything | Green suite | pr |
 | pr | Commit, push, create PR, monitor CI | Merged PR | done |
 
 ### Shortcuts
@@ -44,9 +45,12 @@ After work is complete, do a deep review of the implementation:
 /workflows:review — cross-reference the implementation vs the brainstorm and plan to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
 
 After review, resolve all findings:
-Address ALL review findings. Use subagents to divide and conquer — give each a proper slice of findings to handle. Auto-fix divergences from the plan. P1 findings must be fixed before proceeding.
+Address ALL review findings. Use subagents to divide and conquer — give each a proper slice of findings to handle. Auto-fix divergences from the plan. P1 findings must be fixed before proceeding. If a finding can't be resolved after 3 attempts, escalate to the captain for a design decision or bounce back to brainstorm.
 
-After all findings are resolved, ship it:
+After resolving, verify everything still works:
+Run the full test suite, typecheck, and build. ALL must pass before proceeding. Do not trust that resolve kept things green — verify fresh.
+
+After verification passes, ship it:
 Commit all changes, push to branch worktree-{{name}}, and create a PR to main. After pushing, run `gh pr checks` to monitor CI and fix any failures.
 
 RULES:
@@ -72,9 +76,12 @@ After work is complete, do a deep review of the implementation:
 /workflows:review — cross-reference the implementation vs the brainstorm and plan to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
 
 After review, resolve all findings:
-Address ALL review findings using subagents to divide and conquer. P1 findings must be fixed before proceeding.
+Address ALL review findings using subagents to divide and conquer. P1 findings must be fixed before proceeding. If a finding can't be resolved after 3 attempts, escalate to the captain for a design decision or bounce back to brainstorm.
 
-After all findings are resolved, ship it:
+After resolving, verify everything still works:
+Run the full test suite, typecheck, and build. ALL must pass before proceeding.
+
+After verification passes, ship it:
 Commit all changes, push to branch worktree-{{name}}, and create a PR to main. After pushing, run `gh pr checks` to monitor CI and fix any failures.
 
 RULES:
@@ -95,9 +102,12 @@ After work is complete, do a deep review of the implementation:
 /workflows:review — cross-reference the implementation vs the plan and any linked brainstorm doc to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
 
 After review, resolve all findings:
-Address ALL review findings using subagents to divide and conquer. P1 findings must be fixed before proceeding.
+Address ALL review findings using subagents to divide and conquer. P1 findings must be fixed before proceeding. If a finding can't be resolved after 3 attempts, escalate to the captain for a design decision or bounce back to brainstorm.
 
-After all findings are resolved, ship it:
+After resolving, verify everything still works:
+Run the full test suite, typecheck, and build. ALL must pass before proceeding.
+
+After verification passes, ship it:
 Commit all changes, push to branch worktree-{{name}}, and create a PR to main. After pushing, run `gh pr checks` to monitor CI and fix any failures.
 
 RULES:

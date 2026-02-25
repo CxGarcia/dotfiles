@@ -112,7 +112,7 @@ The captain recognizes common workflow patterns and constructs appropriate sessi
 
 Two workflows are defined:
 
-- [[workflow-feature-dev]] — brainstorm → plan → work → review → resolve → PR. For building new features, refactoring, or complex fixes. Always uses `--worktree`.
+- [[workflow-feature-dev]] — brainstorm → plan → work → review → resolve → verify → PR. Can enter at any phase (brainstorm, plan, work, or slfg). For building new features, refactoring, or complex fixes. Always uses `--worktree`.
 - [[workflow-parallel-audit]] — fan-out N sessions for review/simplify/test across subsystems. For codebase-wide sweeps.
 
 ### Recognizing workflows
