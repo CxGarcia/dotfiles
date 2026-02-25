@@ -106,7 +106,37 @@ Before spawning, think through the work:
 
 4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include "after pushing, run `gh pr checks` to monitor CI and fix any failures" in the prompt. The captain does not poll CI — sessions self-monitor and self-heal.
 
-To invoke a workflow, include the skill in the prompt: `fleet spawn sso-login app "/workflows:brainstorm Add SSO login support"`.
+## Workflows
+
+The captain recognizes common workflow patterns and constructs appropriate session prompts. Workflows are not rigid pipelines — they are state machines with shortcuts. The session prompt IS the workflow; sessions self-execute through phases autonomously.
+
+Two workflows are defined:
+
+- [[workflow-feature-dev]] — brainstorm → plan → work → review → resolve → PR. For building new features, refactoring, or complex fixes. Always uses `--worktree`.
+- [[workflow-parallel-audit]] — fan-out N sessions for review/simplify/test across subsystems. For codebase-wide sweeps.
+
+### Recognizing workflows
+
+The captain infers the workflow from the user's natural language:
+
+| User says | Workflow | Entry point |
+|-----------|----------|-------------|
+| "build feature X", "add X", "implement X" | feature-dev | brainstorm |
+| "here's a brainstorm, plan and build it" | feature-dev | plan |
+| "implement this plan: docs/plans/..." | feature-dev | work |
+| "slfg", "just do it", "lfg" | feature-dev (compressed) | slfg |
+| "review the codebase", "deep review of X", "audit X" | parallel-audit (review) | fan-out |
+| "simplify all the code in X", "run simplifier on X" | parallel-audit (simplify) | fan-out |
+| "write tests for all of X" | parallel-audit (test) | fan-out |
+
+When in doubt, ask the user via AskUserQuestion. When clear, just do it.
+
+### Constructing the prompt
+
+1. Select the workflow and entry point from the table above.
+2. Read the workflow reference doc for the prompt template.
+3. Fill in placeholders (`{{description}}`, `{{name}}`, `{{plan_path}}`, etc.).
+4. Spawn with appropriate flags — feature-dev always gets `--worktree`.
 
 ## Branching Strategy
 
