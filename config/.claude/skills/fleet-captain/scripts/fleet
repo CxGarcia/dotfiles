@@ -228,30 +228,42 @@ async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
   return false
 }
 
-async function checkSessionState(target: string, captureLines = 5): Promise<{ state: string; content: string | null }> {
+async function checkSessionState(target: string, captureLines = 20): Promise<{ state: string; content: string }> {
   const result = await $`tmux display-message -t ${target} -p ${FMT_STATE}`.quiet().nothrow()
-  if (result.exitCode !== 0) return { state: "gone", content: null }
+  if (result.exitCode !== 0) return { state: "gone", content: "" }
 
   const [cmd, dead, deadStatus, title] = result.text().trim().split(SEP)
 
   if (cmd !== "claude") {
     if (dead === "1") {
-      return { state: deadStatus === "0" ? "exited" : `crashed:${deadStatus}`, content: null }
+      return { state: deadStatus === "0" ? "exited" : `crashed:${deadStatus}`, content: "" }
     }
-    return { state: "exited", content: null }
+    return { state: "exited", content: "" }
   }
 
+  // Always capture pane output — ground truth for state detection
+  const raw = (await $`tmux capture-pane -t ${target} -p -S -${captureLines}`.quiet().nothrow()).text()
+  const allLines = raw.split("\n")
+  const lastNonEmpty = allLines.findLastIndex(l => l.trim() !== "")
+  const lines = allLines.slice(Math.max(0, lastNonEmpty - (captureLines - 1)), lastNonEmpty + 1)
+  const content = lines.join("\n")
+  const tail = lines.slice(-5).join("\n")
+
+  // Blocked: y/n confirmation prompt (check tail)
+  if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(tail)) return { state: "blocked", content }
+
+  // Picker: interactive selection UI (check full range — pickers can be tall)
+  if (/Enter to select|Enter to confirm|Space to select|to navigate/.test(content)) return { state: "picker", content }
+
+  // If pane_title says idle, check for unsubmitted text in the input buffer
   if (title.startsWith("✳")) {
-    const lines = (await $`tmux capture-pane -t ${target} -p`.quiet().nothrow()).text().split("\n")
-    const lastNonEmpty = lines.findLastIndex(l => l.trim() !== "")
-    const content = lines.slice(Math.max(0, lastNonEmpty - (captureLines - 1)), lastNonEmpty + 1).join("\n")
-    const stateContent = lines.slice(Math.max(0, lastNonEmpty - 4), lastNonEmpty + 1).join("\n")
-    if (/\[y\/n\]|\[Y\/n\]|\[yes\/no\]/.test(stateContent)) return { state: "blocked", content }
-    if (/Enter to select|Space to select|to confirm|to navigate/.test(stateContent)) return { state: "picker", content }
+    const lastLine = lines[lines.length - 1] ?? ""
+    if (/❯\s*\S/.test(lastLine)) return { state: "buffer", content }
     return { state: "idle", content }
   }
 
-  return { state: "working", content: null }
+  // Title says not-idle — working
+  return { state: "working", content }
 }
 
 interface Feature {
@@ -374,7 +386,7 @@ interface SessionRow {
   ci: string
   title: string
   tmuxTarget: string
-  paneContent: string | null
+  paneContent: string
   discoveredPrNumber?: number
 }
 
@@ -570,7 +582,7 @@ fleet.command("status")
     }
 
     for (const row of rows) {
-      if (["idle", "blocked", "picker"].includes(row.state) && row.paneContent) {
+      if (row.paneContent) {
         console.log(`\nPANE:${row.name}`)
         console.log(row.paneContent)
       }
@@ -616,15 +628,14 @@ fleet.command("check")
     console.log(STATUS_HEADER)
     console.log(`${name}\t${state}\t${repo}\t${branch}\t${prCi.pr}\t${prCi.ci}\t${title}`)
 
-    if (["idle", "working", "blocked", "picker"].includes(state)) {
+    if (paneContent) {
       console.log("\nPANE_OUTPUT:")
-      const content = paneContent ?? (await $`tmux capture-pane -t ${feat.tmuxSessionId} -p -S -5`.quiet().nothrow()).text()
-      console.log(content)
+      console.log(paneContent)
     }
   })
 
 fleet.command("check-active")
-  .description("Detailed state of all working/picker/blocked sessions (skips idle/gone/exited)")
+  .description("State of all working/picker/blocked/buffer sessions with pane excerpts")
   .action(async () => {
     const features = activeFeatures()
     if (features.length === 0) {
@@ -662,7 +673,7 @@ fleet.command("check-active")
     }
     if (cacheChanged) writePrCache(prCache)
 
-    const rows = allRows.filter(r => ["working", "picker", "blocked"].includes(r.state))
+    const rows = allRows.filter(r => ["working", "picker", "blocked", "buffer"].includes(r.state))
 
     if (rows.length === 0) {
       console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
@@ -675,10 +686,10 @@ fleet.command("check-active")
     }
 
     for (const row of rows) {
-      const content = row.paneContent ?? (await $`tmux capture-pane -t ${row.tmuxTarget} -p -S -20`.quiet().nothrow()).text().trim()
-      if (content) {
+      if (row.paneContent) {
+        const excerpt = row.paneContent.split("\n").slice(-5).join("\n")
         console.log(`\nPANE:${row.name}`)
-        console.log(content)
+        console.log(excerpt)
       }
     }
   })
@@ -836,7 +847,7 @@ interface WatchEvent {
 
 function watchEventPriority(type: string, state?: string): number {
   if (type === "state_change") {
-    if (state === "picker" || state === "blocked") return 0
+    if (state === "picker" || state === "blocked" || state === "buffer") return 0
     if (state === "idle" || state === "gone" || state === "exited" || state?.startsWith("crashed")) return 1
     if (state === "working") return 2
     return 3
@@ -958,6 +969,7 @@ fleet.command("watch")
           if (e.type === "state_change") {
             const hint = e.to === "picker" ? `fleet check ${e.feature}; fleet pick ${e.feature} <N>` :
                          e.to === "blocked" ? `fleet check ${e.feature}; fleet keys ${e.feature} y/n` :
+                         e.to === "buffer" ? `fleet check ${e.feature}` :
                          e.to === "idle" ? `fleet check ${e.feature}` :
                          e.to === "gone" || e.to === "exited" ? `fleet kill --gone` :
                          e.to?.startsWith("crashed") ? `fleet check ${e.feature}` : ""
@@ -1105,7 +1117,8 @@ fleet.command("poll")
     const offsetFile = join(FLEET_DIR, ".events_offset")
     let lastOffset = existsSync(offsetFile) ? parseInt(readFileSync(offsetFile, "utf-8")) || 0 : 0
 
-    const events: string[] = []
+    const output: string[] = []
+    let eventCount = 0
 
     if (existsSync(EVENTS)) {
       const content = readFileSync(EVENTS, "utf-8")
@@ -1120,11 +1133,12 @@ fleet.command("poll")
           } catch {}
         }
         for (const e of deduped.values()) {
-          if (e.event === "pr_created") events.push(`  ${e.feature}: PR created ${e.url ?? ""}`)
-          else if (e.event === "pushed") events.push(`  ${e.feature}: pushed ${e.branch ?? ""}`)
-          else if (e.event === "committed") events.push(`  ${e.feature}: committed`)
-          else if (e.event === "context_warning") events.push(`  ${e.feature}: context compacting — may lose coherence`)
-          else events.push(`  ${e.feature}: ${e.event}`)
+          if (e.event === "pr_created") output.push(`  ${e.feature}: PR created ${e.url ?? ""}`)
+          else if (e.event === "pushed") output.push(`  ${e.feature}: pushed ${e.branch ?? ""}`)
+          else if (e.event === "committed") output.push(`  ${e.feature}: committed`)
+          else if (e.event === "context_warning") output.push(`  ${e.feature}: context compacting — may lose coherence`)
+          else output.push(`  ${e.feature}: ${e.event}`)
+          eventCount++
         }
         lastOffset = currentSize
       }
@@ -1132,29 +1146,39 @@ fleet.command("poll")
 
     const newSnapshot: Record<string, string> = {}
     const pollStates = await Promise.allSettled(
-      features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+      features.map(async ([name, feat]) => {
+        const { state, content } = await checkSessionState(feat.tmuxSession)
+        return { name, state, content }
+      })
     )
     for (const r of pollStates) {
       if (r.status !== "fulfilled") continue
-      const { name, state: current } = r.value
+      const { name, state: current, content } = r.value
       newSnapshot[name] = current
       const previous = snapshot[name]
       if (previous && previous !== current) {
         const hint = current === "picker" ? ` — fleet pick ${name} <N>` :
                      current === "blocked" ? ` — fleet keys ${name} y/n` :
+                     current === "buffer" ? ` — fleet check ${name}` :
                      current === "gone" || current === "exited" ? ` — fleet kill --gone` :
                      current?.startsWith("crashed") ? ` — fleet check ${name}` : ""
-        events.push(`  ${name}: ${previous} → ${current}${hint}`)
+        output.push(`  ${name}: ${previous} → ${current}${hint}`)
+        eventCount++
+        if (["picker", "blocked", "buffer"].includes(current) && content) {
+          for (const line of content.split("\n").slice(-5)) {
+            output.push(`    │ ${line}`)
+          }
+        }
       }
     }
 
     writeFileSync(offsetFile, String(lastOffset))
     writeFileSync(snapshotFile, JSON.stringify(newSnapshot))
 
-    if (events.length === 0) return
+    if (eventCount === 0) return
 
-    console.log(`--- Fleet Events (${events.length} new) ---`)
-    for (const e of events) console.log(e)
+    console.log(`--- Fleet Events (${eventCount} new) ---`)
+    for (const line of output) console.log(line)
     console.log("--- End Fleet Events ---")
   })
 
@@ -1534,7 +1558,7 @@ fleet.command("install")
         ["spawn", "Create a new feature session"],
         ["status", "Snapshot of all active features"],
         ["check", "Detailed state of one feature"],
-        ["check-active", "State of working/picker/blocked sessions"],
+        ["check-active", "State of working/picker/blocked/buffer sessions"],
         ["pr", "Monitor PR: CI, reviews, comments, merge state"],
         ["poll", "Non-blocking event + state check (used by hooks)"],
         ["send", "Send text to a session"],
