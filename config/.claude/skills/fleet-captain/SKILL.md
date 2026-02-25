@@ -29,7 +29,7 @@ Every turn follows this cycle:
 1. **Read events** — "Fleet Events" arrive automatically via the UserPromptSubmit hook. Classify by priority (P0/P1/P2).
 2. **Synthesize** — Report fleet state to the user in one concise line. Lead with what needs attention.
 3. **Act** — Handle P0 items immediately (pickers, blockers, CI failures). Queue P1 items for the user to decide on. Mention P2 items only if relevant.
-4. **Wait** — Events arrive on the next user message. Do NOT poll in a loop or run `fleet watch` in the captain session.
+4. **Wait** — Events arrive on the next user message. Don't poll in a loop or run `fleet watch` in the captain session.
 
 When there are no events, just respond to the user normally. Don't announce "no fleet activity" unless asked.
 
@@ -100,7 +100,7 @@ Before spawning, think through the work:
    - **Name?** Generate a short kebab-case name from the prompt (e.g., "Add SSO login" -> `sso-login`). Only ask if ambiguous.
 
 3. **Set scope** when you want to constrain what a session does:
-   - `--scope research` — Reading and analysis only. Include "Do NOT modify any files" in the prompt.
+   - `--scope research` — Reading and analysis only. Include "do not modify any files" in the prompt.
    - `--scope implement` — Building and coding.
    - `--scope any` — No constraints (default).
 
@@ -108,7 +108,7 @@ Before spawning, think through the work:
 
 ## Workflows
 
-The captain recognizes common workflow patterns and constructs appropriate session prompts. Workflows are not rigid pipelines — they are state machines with shortcuts. The session prompt IS the workflow; sessions self-execute through phases autonomously.
+The captain recognizes common workflow patterns and constructs appropriate session prompts. Workflows are not rigid pipelines — they are state machines with shortcuts. The session prompt is the workflow; sessions self-execute through phases autonomously.
 
 Two workflows are defined:
 
@@ -142,7 +142,7 @@ When in doubt, ask the user via AskUserQuestion. When clear, just do it.
 
 **This is the most critical section. Branch mismanagement is the #1 cause of fleet failures.** Sessions pushing to wrong branches, basing work on stale code, or mixing changes across PRs causes real damage. Follow these rules exactly.
 
-### Rule 1: Any session that creates commits MUST use `--worktree`
+### Rule 1: Use `--worktree` for any session that creates commits
 
 `--worktree` guarantees three things:
 - Fetches `origin/main` before branching (never stale)
@@ -175,7 +175,7 @@ fleet desc fix-auth --pr 42 --branch worktree-fix-auth
 The `--worktree` flag handles this automatically — it fetches and branches from `origin/main`. But you must also enforce this in prompts. When telling a session to create a new branch (e.g., after a PR was merged and you need a follow-up):
 
 ```
-fleet send fix-auth "The previous PR was merged. Create a NEW branch off origin/main for the follow-up fix. Run 'git fetch origin main && git checkout -b worktree-fix-auth-v2 origin/main' first. Do NOT reuse the old branch."
+fleet send fix-auth "The previous PR was merged. Create a fresh branch off origin/main for the follow-up fix. Run 'git fetch origin main && git checkout -b worktree-fix-auth-v2 origin/main' first. Do not reuse the old branch."
 ```
 
 ### Rule 4: Bind PR in metadata after creation
@@ -190,7 +190,7 @@ This lets `fleet status` and `fleet pr` track CI status.
 
 ### Rule 5: Include branch identity in every git instruction
 
-Sessions lose context over time, especially after context compaction. When sending any instruction that involves git operations, ALWAYS name the branch explicitly:
+Sessions lose context over time, especially after context compaction. When sending any instruction that involves git operations, name the branch explicitly:
 
 **Good:**
 ```
@@ -212,7 +212,7 @@ Before spawning, ask yourself:
 |-----------|--------|
 | New feature/fix work | `--worktree` (creates fresh branch from origin/main) |
 | Continue unmerged branch | `--worktree --branch <existing-branch>` (checks out existing branch in isolated worktree) |
-| Follow-up after merged PR | `--worktree` with NEW name (creates fresh branch; do NOT reuse the merged branch name) |
+| Follow-up after merged PR | `--worktree` with a new name (creates fresh branch; do not reuse the merged branch name) |
 | Research / read-only | No worktree, add `--scope research` |
 | Quick fix on existing branch | `--worktree --branch <branch>` |
 
@@ -221,7 +221,7 @@ Before spawning, ask yourself:
 | Failure | Cause | Prevention |
 |---------|-------|------------|
 | Worktree based on stale main | Spawned without `--worktree` | Always use `--worktree` for commit work — it auto-fetches |
-| Session pushed to merged PR's branch | Session reused old branch name | Spawn with `--worktree` (new branch name). Explicitly say "create a NEW branch" in prompt |
+| Session pushed to merged PR's branch | Session reused old branch name | Spawn with `--worktree` (new branch name). Explicitly say "create a fresh branch" in prompt |
 | Session on wrong branch | Spawned without worktree, inherited repo's checked-out branch | Always use `--worktree` for isolation |
 | Changes pushed to wrong branch | Session lost track of its branch after multiple instructions | Include branch name in every git-related `fleet send` |
 | Two sessions conflict on same branch | Both spawned without worktrees in same repo | One worktree per session. Never share branches between sessions |
@@ -277,9 +277,9 @@ Session is waiting for y/n:
 ### Rogue sessions
 
 Session is doing the wrong thing or going off-track:
-1. `fleet send <name> "STOP. <correction>"` — redirect if it's idle
+1. `fleet send <name> "Stop — <correction>"` — redirect if it's idle
 2. If it's working and ignoring you, `fleet keys <name> C-c` to interrupt, then send correction
-3. If unrecoverable, **recommend** killing to the user — do NOT kill without their approval. Suggest: "Session <name> seems unrecoverable. Want me to kill it and respawn with a better prompt?"
+3. If unrecoverable, recommend killing to the user — get their approval first. Suggest: "Session <name> seems unrecoverable. Want me to kill it and respawn with a better prompt?"
 
 ### CI failures
 
@@ -305,13 +305,13 @@ A `context_warning` event means the session is compacting context. It may lose c
 
 ## Killing & Cleanup
 
-**SAFETY RULE: ALWAYS ask the user before killing any session.** Killing a session can lose uncommitted work. Never run `fleet kill` without explicit user confirmation. This applies to ALL kill scenarios:
+Ask the user before killing any session. Killing can lose uncommitted work, so every kill requires explicit user confirmation — no exceptions.
 
-- **Suggesting sessions to kill** — Present the list of candidates but ASK before executing `fleet kill`.
-- **Cleaning up gone/exited sessions** — Even `fleet kill --gone` requires user approval first. Show which sessions are gone and confirm.
-- **Sessions that seem stuck or done** — Recommend killing but wait for the user to approve.
-- **Idle sessions** — Never run `fleet kill --idle` without asking. Idle is normal; the user decides when to clean up.
-- **Never use `fleet kill -y`** — The `-y` flag skips confirmation. Do not use it.
+- **Suggesting sessions to kill** — present the list of candidates, then ask before executing `fleet kill`.
+- **Cleaning up gone/exited sessions** — `fleet kill --gone` still requires user approval. Show which sessions are gone and confirm.
+- **Sessions that seem stuck or done** — recommend killing but wait for the user to approve.
+- **Idle sessions** — don't run `fleet kill --idle` without asking. Idle is normal; the user decides when to clean up.
+- **The `-y` flag** skips confirmation. Don't use it.
 
 `fleet kill` handles tmux session, worktree, branch, and registry cleanup automatically. See CLI Reference for variants. After killing, verify remaining sessions with `fleet status`.
 
