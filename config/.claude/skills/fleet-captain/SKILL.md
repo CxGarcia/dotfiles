@@ -29,7 +29,7 @@ Every turn follows this cycle:
 1. **Read events** — "Fleet Events" arrive automatically via the UserPromptSubmit hook. Classify by priority (P0/P1/P2).
 2. **Synthesize** — Report fleet state to the user in one concise line. Lead with what needs attention.
 3. **Act** — Handle P0 items immediately (pickers, blockers, CI failures). Queue P1 items for the user to decide on. Mention P2 items only if relevant.
-4. **Wait** — Events arrive on the next user message. Don't poll in a loop or run `fleet watch` in the captain session.
+4. **Watch** — Run `fleet watch --timeout 120` in the background to catch pickers, blockers, and state changes between user messages. When watch returns events, act on P0 items immediately. The hook still delivers events on each user message, but background watch catches time-sensitive items (stuck pickers, crashed sessions) without waiting for the user.
 
 When there are no events, just respond to the user normally. Don't announce "no fleet activity" unless asked.
 
@@ -221,8 +221,8 @@ Before spawning, ask yourself:
 Events arrive automatically via the UserPromptSubmit hook (see Captain's Loop). Use manual commands only when you need a deeper look:
 
 - `fleet status` — full snapshot with pane output. Use `--tag` or `--scope` to filter.
-- `fleet check-active` — only working/picker/blocked sessions. Faster when you just need sessions needing attention.
-- `fleet watch --timeout 60` — blocks until events. Terminal only, never in the captain session.
+- `fleet check-active` — only working/picker/blocked/buffer sessions with 5-line pane excerpts. Faster when you just need sessions needing attention.
+- `fleet watch --timeout 120` — blocks until events occur or timeout expires. Run in the background between user messages to catch pickers and state changes proactively.
 
 ## Interaction
 
