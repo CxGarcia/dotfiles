@@ -186,9 +186,23 @@ async function waitForPaneContent(target: string, pattern: string, maxWait = 10)
 async function tmuxSend(session: string, text: string) {
   const target = `${session}:claude`
   await $`tmux send-keys -t ${target} C-u`.quiet()
-  await $`tmux send-keys -t ${target} -l ${text}`.quiet()
-  const probe = text.slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  await waitForPaneContent(target, probe, 10)
+
+  // Use load-buffer + paste-buffer instead of send-keys -l which truncates at ~1024 bytes
+  const bufName = `fleet_${Date.now()}`
+  const tmpFile = `/tmp/${bufName}.txt`
+  await Bun.write(tmpFile, text)
+  try {
+    await $`tmux load-buffer -b ${bufName} ${tmpFile}`.quiet()
+    await $`tmux paste-buffer -t ${target} -b ${bufName} -d`.quiet()
+  } finally {
+    try { unlinkSync(tmpFile) } catch {}
+  }
+
+  // Verify text appeared before sending Enter. Use a short tail probe (avoids line-wrap splits)
+  // and fall back to head probe since paste-buffer delivery is atomic (head present = all present)
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const tailOk = text.length > 200 && await waitForPaneContent(target, esc(text.slice(-20)), 5)
+  if (!tailOk) await waitForPaneContent(target, esc(text.slice(0, 40)), 5)
   await $`tmux send-keys -t ${target} Enter`.quiet()
 }
 
