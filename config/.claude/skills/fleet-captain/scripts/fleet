@@ -338,6 +338,19 @@ async function resolveFeaturePrDisplay(name: string, feat: Feature, prCache?: Re
 
 const STATUS_HEADER = "Name\tState\tRepo\tBranch\tPR\tCI\tTitle"
 
+interface SessionRow {
+  name: string
+  state: string
+  repo: string
+  branch: string
+  pr: string
+  ci: string
+  title: string
+  tmuxTarget: string
+  paneContent: string | null
+  discoveredPrNumber?: number
+}
+
 interface Registry {
   version: number
   updated: string
@@ -510,15 +523,17 @@ fleet.command("status")
     )
 
     const rows = results
-      .filter((r): r is PromiseFulfilledResult<{ name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string; paneContent: string | null; discoveredPrNumber?: number }> => r.status === "fulfilled")
+      .filter((r): r is PromiseFulfilledResult<SessionRow> => r.status === "fulfilled")
       .map(r => r.value)
 
+    let cacheChanged = false
     for (const row of rows) {
       if (row.discoveredPrNumber) {
         updateFeature(row.name, { pr: { number: row.discoveredPrNumber, ciStatus: "unknown", lastChecked: ts() } })
+        cacheChanged = true
       }
     }
-    writePrCache(prCache)
+    if (cacheChanged) writePrCache(prCache)
 
     console.log(STATUS_HEADER)
     for (const row of rows) {
@@ -606,15 +621,17 @@ fleet.command("check-active")
     )
 
     const allRows = results
-      .filter((r): r is PromiseFulfilledResult<{ name: string; state: string; repo: string; branch: string; pr: string; ci: string; title: string; tmuxTarget: string; paneContent: string | null; discoveredPrNumber?: number }> => r.status === "fulfilled")
+      .filter((r): r is PromiseFulfilledResult<SessionRow> => r.status === "fulfilled")
       .map(r => r.value)
 
+    let cacheChanged = false
     for (const row of allRows) {
       if (row.discoveredPrNumber) {
         updateFeature(row.name, { pr: { number: row.discoveredPrNumber, ciStatus: "unknown", lastChecked: ts() } })
+        cacheChanged = true
       }
     }
-    writePrCache(prCache)
+    if (cacheChanged) writePrCache(prCache)
 
     const rows = allRows.filter(r => ["working", "picker", "blocked"].includes(r.state))
 
@@ -629,9 +646,10 @@ fleet.command("check-active")
     }
 
     for (const row of rows) {
-      if (row.paneContent) {
+      const content = row.paneContent ?? (await $`tmux capture-pane -t ${row.tmuxTarget} -p -S -20`.quiet().nothrow()).text().trim()
+      if (content) {
         console.log(`\nPANE:${row.name}`)
-        console.log(row.paneContent)
+        console.log(content)
       }
     }
   })
@@ -1218,8 +1236,12 @@ fleet.command("kill")
     if (opts.all) {
       targets = activeFeatures().map(([n]) => n)
     } else if (opts.idle || opts.gone) {
-      for (const [name, feat] of activeFeatures()) {
-        const { state } = await checkSessionState(feat.tmuxSession)
+      const killStates = await Promise.allSettled(
+        activeFeatures().map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+      )
+      for (const r of killStates) {
+        if (r.status !== "fulfilled") continue
+        const { name, state } = r.value
         if (opts.idle && state === "idle") targets.push(name)
         if (opts.gone && (["gone", "exited"].includes(state) || state.startsWith("crashed"))) targets.push(name)
       }
@@ -1255,14 +1277,13 @@ fleet.command("kill")
 fleet.command("list")
   .description("List fleet-managed tmux sessions")
   .action(async () => {
-    const fmt = "#{session_id} #{session_name} #{@fleet_managed} #{pane_current_command} #{@claude_task}"
+    const fmt = `#{session_id}${SEP}#{session_name}${SEP}#{@fleet_managed}${SEP}#{pane_current_command}${SEP}#{@claude_task}`
     const sessions = (await $`tmux list-sessions -F ${fmt}`.quiet().nothrow()).text().trim()
     if (!sessions) return
 
     for (const line of sessions.split("\n")) {
-      const [id, sname, managed, cmd, ...taskParts] = line.split(" ")
+      const [id, sname, managed, cmd, task] = line.split(SEP)
       if (managed !== "1") continue
-      const task = taskParts.join(" ").trim()
       console.log(`ID=${id} NAME=${sname} CMD=${cmd}${task ? " TITLE=" + task : ""}`)
     }
   })

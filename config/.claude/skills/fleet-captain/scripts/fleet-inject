@@ -9,7 +9,9 @@ FLEET_BIN="$HOME/.claude/skills/fleet-captain/scripts/fleet"
 
 [ -f "$REGISTRY" ] || exit 0
 
-grep -qE '"status"[[:space:]]*:[[:space:]]*"(active|blocked)"' "$REGISTRY" || exit 0
+# Fast check: any feature not done/abandoned? (approximation — grep on raw JSON)
+grep -q '"status"' "$REGISTRY" || exit 0
+grep -qvE '"status"[[:space:]]*:[[:space:]]*"(done|abandoned)"' "$REGISTRY" || exit 0
 
 OUTPUT=$("$FLEET_BIN" poll 2>/dev/null)
 [ -n "$OUTPUT" ] || exit 0
