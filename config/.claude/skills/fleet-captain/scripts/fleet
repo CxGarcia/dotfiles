@@ -21,6 +21,7 @@ const EVENTS = join(FLEET_DIR, "events.jsonl")
 const REPOS = join(FLEET_DIR, "repos.json")
 const PR_CACHE = join(FLEET_DIR, ".pr_cache.json")
 const PR_CACHE_TTL = 300_000
+const CLAUDE_JSON = join(HOME, ".claude.json")
 
 mkdirSync(FLEET_DIR, { recursive: true })
 if (!existsSync(REGISTRY)) writeFileSync(REGISTRY, JSON.stringify({ version: 1, updated: "", features: {} }))
@@ -73,6 +74,18 @@ async function confirm(message: string): Promise<boolean> {
       resolve(answer.toLowerCase() === "y")
     })
   })
+}
+
+function ensureTrusted(dirPath: string) {
+  const absPath = resolve(dirPath)
+  const data = JSON.parse(readFileSync(CLAUDE_JSON, "utf-8"))
+  if (!data.projects) data.projects = {}
+  if (!data.projects[absPath]) data.projects[absPath] = {}
+  if (data.projects[absPath].hasTrustDialogAccepted) return
+  data.projects[absPath].hasTrustDialogAccepted = true
+  const tmp = `${CLAUDE_JSON}.tmp`
+  writeFileSync(tmp, JSON.stringify(data, null, 2))
+  renameSync(tmp, CLAUDE_JSON)
 }
 
 function activeFeatures(): [string, Feature][] {
@@ -431,6 +444,8 @@ fleet.command("spawn")
       }
       workDir = worktreePath
     }
+
+    ensureTrusted(workDir)
 
     await $`tmux new-session -d -s ${sessionName} -n claude -c ${workDir}`.quiet()
     await $`tmux set-option -t ${sessionName} @fleet_managed 1`.quiet()
@@ -1335,6 +1350,39 @@ fleet.command("prune")
     const newSize = Buffer.byteLength(content)
     writeFileSync(join(FLEET_DIR, ".events_offset"), String(newSize))
     console.log(`PRUNED: ${before} -> ${kept.length} events (offset reset to ${newSize})`)
+  })
+
+fleet.command("clean-trust")
+  .description("Remove stale worktree trust entries from ~/.claude.json")
+  .option("--dry-run", "Show what would be removed without modifying")
+  .action((opts) => {
+    const data = JSON.parse(readFileSync(CLAUDE_JSON, "utf-8"))
+    if (!data.projects) { console.log("No projects in ~/.claude.json"); return }
+    const paths = Object.keys(data.projects)
+    let removed = 0
+    for (const p of paths) {
+      if (!p.includes("/worktrees/")) continue
+      if (existsSync(p)) continue
+      if (opts.dryRun) {
+        console.log(`WOULD_REMOVE: ${p}`)
+      } else {
+        delete data.projects[p]
+        console.log(`REMOVED: ${p}`)
+      }
+      removed++
+    }
+    if (removed === 0) {
+      console.log("NO_STALE_ENTRIES")
+      return
+    }
+    if (!opts.dryRun) {
+      const tmp = `${CLAUDE_JSON}.tmp`
+      writeFileSync(tmp, JSON.stringify(data, null, 2))
+      renameSync(tmp, CLAUDE_JSON)
+      console.log(`CLEANED: ${removed} stale worktree entries removed`)
+    } else {
+      console.log(`DRY_RUN: ${removed} entries would be removed`)
+    }
   })
 
 fleet.command("desc")
