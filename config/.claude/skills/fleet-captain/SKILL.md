@@ -24,12 +24,12 @@ Idle sessions are normal. Silence is not failure.
 
 ## Captain's Loop
 
-The captain always has a background watch running. This is the core monitoring loop:
+The captain runs a single continuous background watch. This is the core monitoring loop:
 
-1. **Start watch** — Run `fleet watch --timeout 120 --interval 5` with `run_in_background=true`. Always have exactly one watch running.
-2. **Read events** — When the watch completes (events detected or timeout), read the output. Also read "Fleet Events" from the UserPromptSubmit hook when the user sends a message. Classify all events by priority (P0/P1/P2).
-3. **Act** — Handle P0 items immediately: check pane content with `fleet check <name>`, then `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
-4. **Restart watch** — Immediately start a new background watch after handling events. The captain is never without a watch running.
+1. **Start watch** — Run `fleet watch --continuous` with `run_in_background=true` at session start. This runs indefinitely, printing events in append-friendly batches delimited by `=== <timestamp> ===`. One watch process — never restart unless it dies.
+2. **Read events** — Tail the watch output file for new event batches. Also read "Fleet Events" from the UserPromptSubmit hook when the user sends a message. Classify all events by priority (P0/P1/P2).
+3. **Act** — Trivial pickers are auto-picked by the watch (see Picker Handling below). For remaining P0 items: `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
+4. **No restart needed** — The continuous watch runs until killed. Only start a new one if the previous watch process dies.
 
 When there are no events, just respond to the user normally. Don't announce "no fleet activity" unless asked.
 
@@ -53,7 +53,7 @@ fleet status [--tag <t>] [--scope <s>] # snapshot of all features with pane outp
 fleet check <name>                     # detailed state of one feature
 fleet check-active                     # state of working/picker/blocked only
 fleet poll                             # non-blocking event + state check (hooks)
-fleet watch [--timeout 60] [--interval 3]  # block until events (terminal only)
+fleet watch [--continuous] [--timeout 60] [--interval 5]  # block until events; --continuous never exits
 fleet list                             # list fleet-managed tmux sessions
 
 # Interaction
@@ -225,7 +225,8 @@ The background watch (see Captain's Loop) is the primary monitoring mechanism. T
 - `fleet status` — full snapshot with pane output for all sessions. Use `--tag` or `--scope` to filter.
 - `fleet check <name>` — detailed state + 20-line pane output for one session. Use after watch reports a state change to see what's happening.
 - `fleet check-active` — only working/picker/blocked/buffer sessions with 5-line pane excerpts. Faster when you just need sessions needing attention.
-- `fleet watch --timeout 120 --interval 5` — blocks until events occur or timeout expires. Always run this in the background with `run_in_background=true`. Restart immediately after it completes.
+- `fleet watch --continuous` — runs indefinitely, detecting events and printing them in append-friendly batches. Auto-picks trivial pickers. Run in background with `run_in_background=true` at session start.
+- `fleet watch --timeout 120` — one-shot: blocks until events occur or timeout expires. Use `run_in_background=true`.
 
 ## Interaction
 
@@ -255,10 +256,18 @@ Sends the file path and instruction to each session that isn't gone/picker/block
 
 ### Pickers
 
-Session shows a picker (AskUserQuestion, file selector, etc.):
-1. `fleet check <name>` — read the pane to see the options
-2. `fleet pick <name> <N>` — select the right option
-3. If you can't determine the right choice, ask the user
+Trivial pickers are auto-picked by `fleet watch --continuous`:
+- Options marked "(Recommended)"
+- Trust confirmations ("Yes, I trust this folder")
+- Branch creation ("Create new branch from main")
+- PR push confirmations ("Push and create PR")
+
+Auto-picks appear as `AUTO_PICKED: <name> option <N> (<reason>)` in the watch output. No captain action needed.
+
+For non-trivial pickers (design decisions):
+1. The watch output includes the last 10 lines of pane content for context
+2. Check if the answer is obvious from the conversation context. If confident, `fleet pick <name> <N>` and note why
+3. If there's ANY uncertainty about which option is right, surface the picker to the user with pane context and ask them to choose. Never guess on design decisions — ask
 
 ### Blockers (confirmation prompts)
 

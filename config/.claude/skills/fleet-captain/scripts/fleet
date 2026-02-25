@@ -847,6 +847,9 @@ interface WatchEvent {
   url?: string
   branch?: string
   message?: string
+  paneContext?: string
+  autoPickedOption?: number
+  autoPickedReason?: string
 }
 
 function watchEventPriority(type: string, state?: string): number {
@@ -868,26 +871,64 @@ function watchEventPriority(type: string, state?: string): number {
   }
 }
 
+const TRIVIAL_PICKER_PATTERNS: [RegExp, string][] = [
+  [/yes,?\s*i\s*trust/i, "trust confirmation"],
+  [/create\s*new\s*branch/i, "branch creation"],
+  [/push\s*and\s*create\s*pr/i, "PR creation"],
+]
+
+function parsePicker(content: string): { options: { num: number; text: string }[]; recommended: number | null } | null {
+  const options: { num: number; text: string }[] = []
+  let recommended: number | null = null
+  for (const line of content.split("\n")) {
+    const match = line.match(/^\s*[❯ ]\s*(\d+)\.\s*(.+)$/)
+    if (!match) continue
+    const num = parseInt(match[1])
+    const text = match[2].trim()
+    options.push({ num, text })
+    if (/\(Recommended\)/i.test(text)) recommended = num
+  }
+  if (options.length === 0) return null
+  return { options, recommended }
+}
+
+function findTrivialPick(picker: ReturnType<typeof parsePicker>): { num: number; reason: string } | null {
+  if (!picker) return null
+  if (picker.recommended !== null) {
+    return { num: picker.recommended, reason: "marked (Recommended)" }
+  }
+  for (const opt of picker.options) {
+    for (const [pattern, label] of TRIVIAL_PICKER_PATTERNS) {
+      if (pattern.test(opt.text)) return { num: opt.num, reason: label }
+    }
+  }
+  return null
+}
+
 fleet.command("watch")
   .description("Block until fleet events occur or timeout expires")
-  .option("--timeout <seconds>", "Max wait in seconds", "60")
-  .option("--interval <seconds>", "State polling interval in seconds", "3")
+  .option("--timeout <seconds>", "Max wait in seconds")
+  .option("--interval <seconds>", "State polling interval in seconds")
+  .option("--continuous", "Run continuously, never exit unless killed")
   .action(async (opts) => {
-    const timeout = parseInt(opts.timeout)
-    const interval = parseFloat(opts.interval)
-    const features = activeFeatures()
+    const continuous = !!opts.continuous
+    const timeout = opts.timeout ? parseInt(opts.timeout) : (continuous ? Infinity : 60)
+    const interval = opts.interval ? parseFloat(opts.interval) : (continuous ? 5 : 3)
+    let features = activeFeatures()
 
     if (features.length === 0) {
       console.log("WATCH: no active features")
-      return
+      if (!continuous) return
     }
 
     const snapshot: Record<string, string> = {}
-    const initialStates = await Promise.allSettled(
-      features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
-    )
-    for (const r of initialStates) {
-      if (r.status === "fulfilled") snapshot[r.value.name] = r.value.state
+    if (features.length > 0) {
+      const initialStates = await Promise.allSettled(
+        features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+      )
+      for (const r of initialStates) {
+        if (r.status === "fulfilled") snapshot[r.value.name] = r.value.state
+      }
     }
 
     const offsetFile = join(FLEET_DIR, ".events_offset")
@@ -922,72 +963,76 @@ fleet.command("watch")
 
     async function collectStateChanges() {
       const states = await Promise.allSettled(
-        features.map(async ([name, feat]) => ({ name, state: (await checkSessionState(feat.tmuxSession)).state }))
+        features.map(async ([name, feat]) => {
+          const result = await checkSessionState(feat.tmuxSession, 20)
+          return { name, state: result.state, content: result.content }
+        })
       )
       for (const r of states) {
         if (r.status !== "fulfilled") continue
-        const { name, state: current } = r.value
+        const { name, state: current, content } = r.value
         const previous = snapshot[name]
         if (current !== previous) {
-          collected.push({
+          const event: WatchEvent = {
             ts: ts(),
             feature: name,
             type: "state_change",
             from: previous,
             to: current,
             priority: watchEventPriority("state_change", current),
-          })
+          }
+          if (current === "picker" && content) {
+            event.paneContext = content.split("\n").slice(-10).join("\n")
+          }
+          collected.push(event)
           snapshot[name] = current
         }
       }
     }
 
-    while ((Date.now() - startTime) / 1000 < timeout) {
-      collectFileEvents()
-      await collectStateChanges()
+    function printBatch(events: WatchEvent[]) {
+      events.sort((a, b) => a.priority - b.priority || a.ts.localeCompare(b.ts))
+      if (continuous) console.log(`\n=== ${ts()} ===`)
 
-      if (collected.length > 0) {
-        await Bun.sleep(2000)
-        collectFileEvents()
-        await collectStateChanges()
-        break
-      }
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      console.log(`WATCH: ${events.length} event(s)${continuous ? "" : ` in ${elapsed}s`}`)
 
-      await Bun.sleep(interval * 1000)
-    }
-
-    writeFileSync(offsetFile, String(lastOffset))
-    collected.sort((a, b) => a.priority - b.priority || a.ts.localeCompare(b.ts))
-
-    const elapsed = Math.round((Date.now() - startTime) / 1000)
-
-    if (collected.length === 0) {
-      console.log(`WATCH: no events (${elapsed}s)`)
-    } else {
-      console.log(`WATCH: ${collected.length} event(s) in ${elapsed}s`)
-
-      const actionable = collected.filter(e => e.priority <= 1)
+      const actionable = events.filter(e => e.priority <= 1)
       if (actionable.length > 0) {
         console.log("\n--- needs attention ---")
         for (const e of actionable) {
           if (e.type === "state_change") {
-            const hint = e.to === "picker" ? `fleet check ${e.feature}; fleet pick ${e.feature} <N>` :
-                         e.to === "blocked" ? `fleet check ${e.feature}; fleet keys ${e.feature} y/n` :
+            const hint = e.to === "picker" ? `fleet pick ${e.feature} <N>` :
+                         e.to === "blocked" ? `fleet keys ${e.feature} y/n` :
                          e.to === "buffer" ? `fleet check ${e.feature}` :
                          e.to === "idle" ? `fleet check ${e.feature}` :
                          e.to === "gone" || e.to === "exited" ? `fleet kill --gone` :
                          e.to?.startsWith("crashed") ? `fleet check ${e.feature}` : ""
             console.log(`  ${e.feature}: ${e.from} → ${e.to}${hint ? ` — ${hint}` : ""}`)
+            if (e.paneContext) {
+              for (const line of e.paneContext.split("\n")) {
+                console.log(`    │ ${line}`)
+              }
+            }
           } else {
             console.log(`  ${e.feature}: ${e.type}`)
           }
         }
       }
 
+      const autoPickedEvents = events.filter(e => e.autoPickedOption !== undefined)
+      if (autoPickedEvents.length > 0) {
+        console.log("\n--- auto-picked ---")
+        for (const e of autoPickedEvents) {
+          console.log(`  ${e.feature}: option ${e.autoPickedOption} (${e.autoPickedReason})`)
+        }
+      }
+
       console.log("\n--- events ---")
-      for (const e of collected) {
+      for (const e of events) {
         if (e.type === "state_change") {
-          console.log(`  ${e.feature}: ${e.from} → ${e.to}`)
+          const suffix = e.autoPickedOption !== undefined ? ` (auto-picked: ${e.autoPickedReason})` : ""
+          console.log(`  ${e.feature}: ${e.from} → ${e.to}${suffix}`)
         } else if (e.type === "pr_created") {
           console.log(`  ${e.feature}: PR created ${e.url ?? ""}`)
         } else if (e.type === "pushed") {
@@ -1000,10 +1045,76 @@ fleet.command("watch")
           console.log(`  ${e.feature}: ${e.type}`)
         }
       }
+
+      console.log("\n--- states ---")
+      console.log(Object.entries(snapshot).map(([n, s]) => `${n}=${s}`).join(" "))
     }
 
-    console.log("\n--- states ---")
-    console.log(Object.entries(snapshot).map(([n, s]) => `${n}=${s}`).join(" "))
+    async function autoPickTrivial(events: WatchEvent[]) {
+      for (const e of events) {
+        if (e.type !== "state_change" || e.to !== "picker" || !e.paneContext) continue
+        const picker = parsePicker(e.paneContext)
+        const trivial = findTrivialPick(picker)
+        if (!trivial) continue
+        const feat = getFeature(e.feature)
+        if (!feat) continue
+        await $`tmux send-keys -t ${feat.tmuxSession}:claude ${String(trivial.num)}`.quiet().nothrow()
+        e.autoPickedOption = trivial.num
+        e.autoPickedReason = trivial.reason
+        e.priority = 2
+        logEvent(e.feature, "auto_picked", { option: trivial.num, reason: trivial.reason })
+      }
+    }
+
+    while (continuous || (Date.now() - startTime) / 1000 < timeout) {
+      if (continuous) {
+        features = activeFeatures()
+        for (const [name, feat] of features) {
+          if (!(name in snapshot)) {
+            const { state } = await checkSessionState(feat.tmuxSession)
+            snapshot[name] = state
+          }
+        }
+        const activeNames = new Set(features.map(([n]) => n))
+        for (const name of Object.keys(snapshot)) {
+          if (!activeNames.has(name)) delete snapshot[name]
+        }
+        if (features.length === 0) {
+          await Bun.sleep(interval * 1000)
+          continue
+        }
+      }
+
+      collectFileEvents()
+      await collectStateChanges()
+
+      if (collected.length > 0) {
+        await Bun.sleep(2000)
+        collectFileEvents()
+        await collectStateChanges()
+
+        await autoPickTrivial(collected)
+        printBatch(collected)
+        writeFileSync(offsetFile, String(lastOffset))
+
+        if (continuous) {
+          collected.length = 0
+        } else {
+          break
+        }
+      }
+
+      await Bun.sleep(interval * 1000)
+    }
+
+    writeFileSync(offsetFile, String(lastOffset))
+
+    if (!continuous && collected.length === 0) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      console.log(`WATCH: no events (${elapsed}s)`)
+      console.log("\n--- states ---")
+      console.log(Object.entries(snapshot).map(([n, s]) => `${n}=${s}`).join(" "))
+    }
   })
 
 fleet.command("pr")
