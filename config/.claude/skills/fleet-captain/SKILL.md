@@ -279,7 +279,7 @@ Session is waiting for y/n:
 Session is doing the wrong thing or going off-track:
 1. `fleet send <name> "STOP. <correction>"` — redirect if it's idle
 2. If it's working and ignoring you, `fleet keys <name> C-c` to interrupt, then send correction
-3. If unrecoverable, `fleet kill <name>` and respawn with a better prompt
+3. If unrecoverable, **recommend** killing to the user — do NOT kill without their approval. Suggest: "Session <name> seems unrecoverable. Want me to kill it and respawn with a better prompt?"
 
 ### CI failures
 
@@ -295,15 +295,23 @@ If a session misses a CI failure (e.g., it went idle without noticing):
 A `context_warning` event means the session is compacting context. It may lose coherence. Watch for:
 - Repeated actions (doing work it already did)
 - Forgetting the original task
-- If it degrades, kill and respawn with a fresh prompt that includes the progress so far
+- If it degrades, recommend killing to the user — get approval before killing, then respawn with a fresh prompt that includes the progress so far
 
 ### Crashed/gone sessions
 
-1. `fleet kill --gone` — clean up dead sessions
+1. Show the user which sessions are gone/crashed and **ask before cleaning up** — do not run `fleet kill --gone` without approval
 2. Decide whether to respawn based on whether the work was committed/pushed
 3. If the branch has commits, respawn with `--branch` to continue from where it left off
 
 ## Killing & Cleanup
+
+**SAFETY RULE: ALWAYS ask the user before killing any session.** Killing a session can lose uncommitted work. Never run `fleet kill` without explicit user confirmation. This applies to ALL kill scenarios:
+
+- **Suggesting sessions to kill** — Present the list of candidates but ASK before executing `fleet kill`.
+- **Cleaning up gone/exited sessions** — Even `fleet kill --gone` requires user approval first. Show which sessions are gone and confirm.
+- **Sessions that seem stuck or done** — Recommend killing but wait for the user to approve.
+- **Idle sessions** — Never run `fleet kill --idle` without asking. Idle is normal; the user decides when to clean up.
+- **Never use `fleet kill -y`** — The `-y` flag skips confirmation. Do not use it.
 
 `fleet kill` handles tmux session, worktree, branch, and registry cleanup automatically. See CLI Reference for variants. After killing, verify remaining sessions with `fleet status`.
 
