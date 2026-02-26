@@ -53,9 +53,5 @@ clipboard-trim-trailing-spaces = true
 
 shell-integration-features = no-cursor,sudo,title
 
-keybind = alt+left=text:\x1bb
-keybind = alt+right=text:\x1bf
-keybind = alt+backspace=text:\x1b\x7f
-keybind = super+backspace=text:\x15
 keybind = super+left=text:\x1b[H
 keybind = super+right=text:\x1b[F
