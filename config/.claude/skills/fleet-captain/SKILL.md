@@ -11,7 +11,7 @@ allowed-tools: Bash(fleet *) Bash(gh *) Read
 
 You are the captain of the user's feature fleet. Multiple feature sessions run autonomously in tmux. You are the user's single point of contact.
 
-Discrete events from feature sessions (pushed, context_warning) appear as "Fleet Events" at the start of user messages via hooks. Synthesize them by priority:
+Fleet events from feature sessions appear as "Fleet Events" at the start of each user message, injected by the UserPromptSubmit hook. This is the primary event delivery mechanism — it fires every turn. Synthesize events by priority:
 - **P0 (act now):** CI failures, merge conflicts, crashes, pickers, blockers
 - **P1 (next turn):** new reviews/comments, push failures, sessions going idle
 - **P2 (informational):** CI passing, commits, state transitions, spawns
@@ -24,16 +24,13 @@ Idle sessions are normal. Silence is not failure.
 
 ## Captain's Loop
 
-The captain runs a single continuous background watch. This is the core monitoring loop:
+Events arrive via the UserPromptSubmit hook at the start of each turn. The captain reads and acts:
 
-1. **Start watch** — Run `fleet watch --continuous` with `run_in_background=true` at session start. This runs indefinitely, printing events in append-friendly batches delimited by `=== <timestamp> ===`. One watch process — never restart unless it dies.
-2. **Read events** — Tail the watch output file for new event batches. Also read "Fleet Events" from the UserPromptSubmit hook when the user sends a message. Classify all events by priority (P0/P1/P2).
-3. **Act** — Trivial pickers are auto-picked by the watch (see Picker Handling below). For remaining P0 items: `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
-4. **No restart needed** — The continuous watch runs until killed. Only start a new one if the previous watch process dies.
+1. **Read events** — Check for "Fleet Events" at the top of the user's message. These are injected by the hook via `fleet poll`. Classify by priority (P0/P1/P2).
+2. **Act** — For P0 items: `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
+3. **Probe when needed** — Use `fleet check-active` or `fleet status` to get current state when events suggest something needs attention. Don't poll proactively — react to events.
 
 When there are no events, just respond to the user normally. Don't announce "no fleet activity" unless asked.
-
-The hook delivers events on each user message, but the background watch is the primary monitoring mechanism — it catches pickers and state changes proactively without waiting for user input.
 
 ## CLI Reference
 
@@ -53,7 +50,7 @@ fleet status [--tag <t>] [--scope <s>] # snapshot of all features with pane outp
 fleet check <name>                     # detailed state of one feature
 fleet check-active                     # state of working/picker/blocked only
 fleet poll                             # non-blocking event + state check (hooks)
-fleet watch [--continuous] [--timeout 60] [--interval 5]  # block until events; --continuous never exits
+fleet watch [--continuous] [--timeout 60] [--interval 5]  # terminal-only: block until events (not for captain session)
 fleet list                             # list fleet-managed tmux sessions
 
 # Interaction
@@ -220,13 +217,13 @@ Before spawning, ask yourself:
 
 ## Monitoring
 
-The background watch (see Captain's Loop) is the primary monitoring mechanism. The UserPromptSubmit hook also delivers events on each user message as a secondary channel. Use manual commands when you need a deeper look:
+The UserPromptSubmit hook (`fleet poll`) delivers events at the start of each turn — this is how the captain stays informed. Use manual commands when you need a deeper look:
 
 - `fleet status` — full snapshot with pane output for all sessions. Use `--tag` or `--scope` to filter.
-- `fleet check <name>` — detailed state + 20-line pane output for one session. Use after watch reports a state change to see what's happening.
+- `fleet check <name>` — detailed state + 20-line pane output for one session. Use after an event reports a state change to see what's happening.
 - `fleet check-active` — only working/picker/blocked/buffer sessions with 5-line pane excerpts. Faster when you just need sessions needing attention.
-- `fleet watch --continuous` — runs indefinitely, detecting events and printing them in append-friendly batches. Auto-picks trivial pickers. Run in background with `run_in_background=true` at session start.
-- `fleet watch --timeout 120` — one-shot: blocks until events occur or timeout expires. Use `run_in_background=true`.
+
+`fleet watch` is a terminal-only tool for humans monitoring the fleet outside of Claude Code. Don't run it in the captain session — Claude Code cannot be interrupted by background task output, so watch events would be missed.
 
 ## Interaction
 
@@ -256,16 +253,18 @@ Sends the file path and instruction to each session that isn't gone/picker/block
 
 ### Pickers
 
-Trivial pickers are auto-picked by `fleet watch --continuous`:
+When a session enters the `picker` state, the Fleet Events block will show it with a hint: `feature: idle → picker — fleet pick feature <N>`.
+
+**Trivial pickers** — pick immediately without asking the user:
 - Options marked "(Recommended)"
 - Trust confirmations ("Yes, I trust this folder")
 - Branch creation ("Create new branch from main")
 - PR push confirmations ("Push and create PR")
 
-Auto-picks appear as `AUTO_PICKED: <name> option <N> (<reason>)` in the watch output. No captain action needed.
+Run `fleet check <name>` to see the options, then `fleet pick <name> <N>`.
 
-For non-trivial pickers (design decisions):
-1. The watch output includes the last 10 lines of pane content for context
+**Non-trivial pickers** (design decisions):
+1. Run `fleet check <name>` to see the picker options and pane context
 2. Check if the answer is obvious from the conversation context. If confident, `fleet pick <name> <N>` and note why
 3. If there's ANY uncertainty about which option is right, surface the picker to the user with pane context and ask them to choose. Never guess on design decisions — ask
 
