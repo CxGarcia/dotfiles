@@ -28,7 +28,7 @@ Events arrive via the UserPromptSubmit hook at the start of each turn. The capta
 
 1. **Read events** — Check for "Fleet Events" at the top of the user's message. These are injected by the hook via `fleet poll`. Classify by priority (P0/P1/P2).
 2. **Act** — For P0 items: `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
-3. **Probe when needed** — Use `fleet check-active` or `fleet status` to get current state when events suggest something needs attention. Don't poll proactively — react to events.
+3. **Probe when needed** — Use `fleet check-active` or `fleet status` to get current state when events suggest something needs attention. Generally prefer reacting to events over proactive polling, but use your judgment.
 
 When there are no events, just respond to the user normally. Don't announce "no fleet activity" unless asked.
 
@@ -148,7 +148,7 @@ Branch mismanagement is the #1 cause of fleet failures. Sessions pushing to wron
 - Creates an isolated directory (no interference with other sessions or the main repo)
 - Assigns a dedicated branch (no accidental commits to main or other feature branches)
 
-Without `--worktree`, the session works in the repo's current directory on whatever branch is checked out. Other sessions may be sharing that same directory. Never use this for work that modifies files.
+Without `--worktree`, the session works in the repo's current directory on whatever branch is checked out. Other sessions may be sharing that same directory. Avoid this for work that modifies files.
 
 **Worktree** (any work that creates commits, branches, or PRs):
 ```bash
@@ -162,7 +162,7 @@ fleet spawn investigate app "Read the auth module and explain how token refresh 
 
 ### Rule 2: One branch per session, one PR per branch, one concern per PR
 
-Never let a session push changes to a branch that belongs to another session or a different concern. Each spawn creates a branch named `worktree-<name>` by default — that is the session's branch.
+Each spawn creates a branch named `worktree-<name>` by default — that is the session's branch. Avoid letting sessions push to branches that belong to other sessions or different concerns.
 
 When a session creates a PR, immediately bind it:
 ```bash
@@ -225,7 +225,7 @@ The UserPromptSubmit hook (`fleet poll`) delivers events at the start of each tu
 
 Prefer fleet commands over raw tmux — fleet wraps tmux interaction and adds state tracking on top. If you need something fleet doesn't cover, tell the user so we can assess adding it as a fleet command. Only fall back to raw tmux as a last resort, and flag it as a potential fleet feature.
 
-`fleet watch` blocks until events arrive — it's a terminal tool for humans watching the fleet outside of Claude Code. **Never run `fleet watch` in the captain session.** Background Bash output does not interrupt Claude turns, so events would be silently lost. The UserPromptSubmit hook (`fleet poll`) is the captain's event delivery mechanism — it fires every turn automatically.
+`fleet watch` blocks until events arrive — it's a terminal tool for humans watching the fleet outside of Claude Code. Don't run it in the captain session — background Bash output doesn't interrupt Claude turns, so events would be silently lost. The hook (`fleet poll`) already delivers events every turn.
 
 ## Interaction
 
@@ -267,8 +267,9 @@ Run `fleet check <name>` to see the options, then `fleet pick <name> <N>`.
 
 **Non-trivial pickers** (design decisions, approach selection, architecture choices):
 1. Run `fleet check <name>` to see the picker options and pane context
-2. **Always surface non-trivial pickers to the user.** Show the options, provide pane context, and let the user choose. Do not pick on their behalf — even if one option seems obvious to you, the user may have context or preferences you don't know about.
-3. Examples of non-trivial pickers: "Direct DB insert vs RPC call", "REST vs GraphQL", "monolith vs microservice", library/framework choices, data model decisions, any AskUserQuestion from a session
+2. Default to surfacing these to the user — show the options with pane context and let them choose. The user often has context or preferences you don't know about.
+3. If the conversation has already established a clear direction that makes the choice obvious, use your judgment — but mention what you picked and why.
+4. Examples: "Direct DB insert vs RPC call", "REST vs GraphQL", library/framework choices, data model decisions, any AskUserQuestion from a session
 
 ### Blockers (confirmation prompts)
 
@@ -306,15 +307,15 @@ A `context_warning` event means the session is compacting context. It may lose c
 
 ## Killing & Cleanup
 
-**NEVER kill a session without explicit user approval.** This is the captain's most important rule. Killing destroys uncommitted work, worktrees, and branches. There are zero exceptions — not for "done" sessions, not for idle sessions, not for cleanup.
+Always get explicit user approval before killing a session. Killing destroys uncommitted work, worktrees, and branches — this is the one area where the captain must not freelance.
 
 ### Pre-kill checklist
 
-Before even *suggesting* a kill to the user, verify ALL of:
+Before killing, verify:
 
-1. **The user explicitly approved this specific kill** — "kill the idle ones" or "yeah kill auth-sso". Not implied, not assumed. If the user hasn't said to kill it, don't kill it.
-2. **The session's actual task is complete** — A merged PR does not mean "done". The session may have had post-merge work (cleanup, follow-up tasks, verification). Check what the session was *prompted to do* and whether all of it is finished.
-3. **Work is committed and pushed** — Run `fleet check <name>` to verify. If there's uncommitted work, warn the user before killing.
+1. **User approved** — "kill the idle ones" or "yeah kill auth-sso". Not implied, not assumed.
+2. **The session's actual task is complete** — A merged PR doesn't always mean "done". The session may have had post-merge work in its prompt. Check what it was prompted to do.
+3. **Work is saved** — Run `fleet check <name>`. If there's uncommitted work, warn the user before killing.
 
 ### What "done" actually means
 
@@ -332,7 +333,7 @@ Before even *suggesting* a kill to the user, verify ALL of:
 - **Cleaning up gone/exited sessions** — `fleet kill --gone` still requires user approval. Show which sessions are gone and confirm.
 - **Sessions that seem stuck or done** — recommend killing but wait for the user to approve.
 - **Idle sessions** — don't run `fleet kill --idle` without asking. Idle is normal; the user decides when to clean up.
-- **The `-y` flag** skips confirmation. Never use it.
+- **The `-y` flag** skips confirmation. Don't use it.
 
 `fleet kill` handles tmux session, worktree, branch, and registry cleanup automatically. See CLI Reference for variants. After killing, verify remaining sessions with `fleet status`.
 
@@ -344,17 +345,17 @@ The registry (`~/.claude/fleet/registry.json`) is external memory — use `fleet
 
 When summarizing fleet state, keep it compressed: capture reasoning and decisions, not step-by-step action logs. "auth-sso pushed branch, PR #42 CI pending" is better than listing every command the session ran.
 
-## Anti-patterns
+## Common Pitfalls
 
-These are mistakes the captain has made before. Do not repeat them.
+Things to watch out for based on past experience.
 
-| Anti-pattern | Correct behavior |
-|--------------|-----------------|
-| Killing sessions without asking the user | **Always** get explicit user approval before any kill. No exceptions. |
-| Killing a session because "the PR merged" | A merged PR ≠ task complete. Check the full prompted task — there may be post-merge steps. |
-| Using raw tmux commands without trying fleet first | Prefer `fleet check`, `fleet send`, `fleet keys`, etc. If fleet doesn't support what you need, raise it to the user as a potential fleet feature before falling back to raw tmux. |
-| Running `fleet watch` in the captain session | Background output doesn't interrupt Claude turns. The hook (`fleet poll`) delivers events. |
-| Picking a non-trivial option in a picker without asking the user | Surface non-trivial pickers (approach choices, architecture decisions) to the user. Only auto-pick trivial confirmations like "(Recommended)" or "Yes, trust this folder". |
-| Using `~/.claude/skills/fleet-captain/scripts/fleet` or any absolute path | Just use `fleet`. It's on PATH. |
-| Using the `-y` flag on kill | Never skip kill confirmation. |
-| Proactively polling with `fleet status` every turn | React to hook events. Only probe manually when events indicate something needs attention. |
+| Pitfall | Better approach |
+|---------|----------------|
+| Killing sessions without asking the user | Get explicit user approval before any kill. This one causes real damage. |
+| Assuming "PR merged" = task complete | Check the full prompted task — there may be post-merge steps. |
+| Reaching for raw tmux before trying fleet | Prefer fleet commands. If fleet doesn't cover it, raise it to the user as a potential feature. |
+| Running `fleet watch` in the captain session | Doesn't work — background output can't interrupt Claude turns. The hook delivers events. |
+| Auto-picking non-trivial pickers | Default to surfacing design/architecture decisions to the user. |
+| Using full paths like `~/.claude/skills/fleet-captain/scripts/fleet` | Just use `fleet`. It's on PATH. |
+| Using the `-y` flag on kill | Skips confirmation — don't bypass the user. |
+| Polling `fleet status` every turn unprompted | Generally better to react to hook events than poll proactively. |
