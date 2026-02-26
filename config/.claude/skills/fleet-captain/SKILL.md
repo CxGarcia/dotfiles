@@ -125,6 +125,31 @@ Before spawning, think through the work:
 
 4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include in the prompt: "after pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix the issue and push again. Do not go idle until all checks pass."
 
+## Writing Prompts
+
+Agents have their own context, tools, and judgment. The captain's job is to define **what** and **why** — the agent figures out **how**.
+
+**Give agents:**
+- The objective — what we're trying to achieve
+- Relevant context — error messages, previous findings, related sessions' output
+- Constraints — things to avoid, boundaries, scope limits
+
+**Don't give agents:**
+- Numbered step-by-step instructions
+- Exact commands to run
+- Micromanaged implementation details
+
+Bad — prescriptive:
+> 1. Run kubectl port-forward to the settings service on port 50051
+> 2. Call grpcurl with auth headers X, Y, Z
+> 3. Pass CreateWorkspaceRequest with these params
+> 4. Verify by querying the workspaces table
+
+Good — objective-focused:
+> Create a workspace called Development under the Bird account (019c...) via the Settings Service CreateWorkspace RPC. The platform admin workspace d6f18bb2 must not be touched. Previous attempts failed because of missing auth headers — make sure FGA tuples get created.
+
+The same applies to `fleet send` — when redirecting or unblocking a session, describe the problem and the goal, not a recipe.
+
 ## Workflows
 
 The captain recognizes workflow patterns and constructs session prompts from templates. Workflows are state machines with shortcuts — sessions self-execute through phases autonomously.
