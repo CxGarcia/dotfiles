@@ -50,7 +50,7 @@ end)
 
 -- Application hotkeys
 local applicationHotkeys = {
-    f = 'iTerm',
+    f = 'Ghostty',
     n = 'Obsidian',
     m = 'Spotify',
     c = 'Google Chrome',
@@ -85,8 +85,8 @@ local sessionPickerTap = (function()
         local keyCode = event:getKeyCode()
         local isCtrlA = flags.ctrl and not flags.cmd and not flags.alt and not flags.shift and keyCode == 0
 
-        local iterm = hs.application.find('iTerm2')
-        if iterm and iterm:isFrontmost() then
+        local terminal = hs.application.find('Ghostty')
+        if terminal and terminal:isFrontmost() then
             reset()
             return false
         end
@@ -94,10 +94,10 @@ local sessionPickerTap = (function()
         if isCtrlA then
             if waitingForSecond then
                 reset()
-                if iterm then
-                    iterm:activate()
+                if terminal then
+                    terminal:activate()
                 else
-                    hs.application.launchOrFocus('iTerm')
+                    hs.application.launchOrFocus('Ghostty')
                 end
                 hs.timer.doAfter(0.15, function()
                     hs.task.new("/opt/homebrew/bin/tmux", nil, {

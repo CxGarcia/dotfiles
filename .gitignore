@@ -82,3 +82,4 @@ config/.config/karabiner/automatic_backups/karabiner*
 
 # GitHub Copilot credentials
 config/.config/github-copilot/apps.json
+.claude/worktrees
