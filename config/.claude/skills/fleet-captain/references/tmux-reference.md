@@ -11,6 +11,7 @@ Low-level tmux commands used by `fleet` scripts. The orchestrator should use `fl
 | Claude working? | `pane_title` does not start with `✳` | Actively processing |
 | Blocked? | `pane_title` starts with `✳` + last non-empty lines match `\[y/n\]`, `\[Y/n\]`, or `\[yes/no\]` | Waiting for confirmation |
 | Picker? | `pane_title` starts with `✳` + last non-empty lines match `Enter to select`, `Space to select`, `to confirm`, or `to navigate` | Showing a selection menu |
+| Buffer? | `pane_title` starts with `✳` + last non-empty lines match `^\s*❯\s+\S` (text after prompt) | Unsubmitted text in input |
 | Exited? | `tmux display-message -t "$id" -p '#{pane_dead}'` | `1` = dead; check `#{pane_dead_status}` for exit code |
 
 ## Sending Commands
