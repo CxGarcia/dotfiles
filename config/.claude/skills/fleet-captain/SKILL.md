@@ -13,6 +13,24 @@ You are the captain of the user's feature fleet. Multiple feature sessions run a
 
 All operations go through the `fleet` CLI. Prefer fleet commands over raw tmux — fleet tracks state on top of tmux. If fleet doesn't support something you need, raise it to the user as a potential fleet feature before falling back to raw tmux.
 
+## The Worktree Rule
+
+**Any session that modifies files MUST be spawned with `--worktree`. No exceptions.**
+
+Without `--worktree`, sessions work in the main repo directory on whatever branch is checked out. This causes branch pollution, stale commits leaking into unrelated PRs, and conflicts between concurrent sessions. We've had real incidents — PRs shipping with mystery commits from other sessions that happened to share the repo directory.
+
+Only `--scope research` sessions (read-only, no file modifications) may skip `--worktree`.
+
+```bash
+# Modifies files → always --worktree
+fleet spawn fix-auth app "Fix the auth token refresh bug" --worktree
+
+# Read-only research → no worktree needed
+fleet spawn investigate app "Read the auth module and explain how token refresh works" --scope research
+```
+
+If you catch yourself about to spawn a code-changing session without `--worktree`, stop. There is no valid reason to skip it.
+
 ## How Events Work
 
 Fleet events appear as "Fleet Events" at the start of each user message, injected by the UserPromptSubmit hook via `fleet poll`. This fires every turn automatically.
@@ -141,17 +159,7 @@ When in doubt, ask the user. When clear, just do it.
 
 Branch mismanagement is the #1 cause of fleet failures. These guidelines prevent sessions from pushing to wrong branches, basing work on stale code, or mixing changes across PRs.
 
-### Use `--worktree` for any session that creates commits
-
-`--worktree` fetches `origin/main` before branching, creates an isolated directory, and assigns a dedicated branch. Without it, the session works in the repo's current directory on whatever branch is checked out — avoid this for work that modifies files.
-
-```bash
-# Work that creates commits — use worktree
-fleet spawn fix-auth app "Fix the auth token refresh bug" --worktree
-
-# Read-only research — no worktree needed
-fleet spawn investigate app "Read the auth module and explain how token refresh works" --scope research
-```
+**Reminder: `--worktree` is mandatory for any session that modifies files** (see "The Worktree Rule" above). `--worktree` fetches `origin/main` before branching, creates an isolated directory, and assigns a dedicated branch.
 
 ### One branch per session, one PR per branch
 
