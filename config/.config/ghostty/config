@@ -8,7 +8,7 @@ font-feature = -calt
 font-thicken = true
 font-thicken-strength = 200
 adjust-cell-height = 5%
-adjust-cell-width = -2%
+adjust-cell-width = 0
 
 background = #252C33
 foreground = #DCDCDC
