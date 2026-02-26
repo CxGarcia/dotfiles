@@ -1,0 +1,61 @@
+command = /opt/homebrew/bin/fish
+
+font-family = FiraCode Nerd Font Mono
+font-style = SemBd
+font-style-bold = Bold
+font-size = 15
+font-feature = -calt
+font-thicken = true
+font-thicken-strength = 200
+adjust-cell-height = 5%
+adjust-cell-width = -2%
+
+background = #232C34
+foreground = #DCDCDC
+cursor-color = #6FBEBE
+cursor-text = #000000
+selection-background = #B3D6FF
+selection-foreground = #000000
+
+palette = 0=#111316
+palette = 1=#B43C29
+palette = 2=#00C200
+palette = 3=#C7C400
+palette = 4=#2743C7
+palette = 5=#C03FBE
+palette = 6=#00C5C7
+palette = 7=#C7C7C7
+palette = 8=#393A39
+palette = 9=#DD7975
+palette = 10=#58E690
+palette = 11=#ECE100
+palette = 12=#A6ABF2
+palette = 13=#E17DE1
+palette = 14=#60FDFF
+palette = 15=#FFFFFF
+
+cursor-style = block
+cursor-style-blink = true
+
+window-padding-x = 8
+window-padding-y = 4
+window-padding-color = extend
+window-save-state = always
+minimum-contrast = 1
+
+macos-titlebar-style = tabs
+macos-option-as-alt = true
+macos-non-native-fullscreen = true
+
+mouse-hide-while-typing = true
+copy-on-select = true
+clipboard-trim-trailing-spaces = true
+
+shell-integration-features = no-cursor,sudo,title
+
+keybind = alt+left=text:\x1bb
+keybind = alt+right=text:\x1bf
+keybind = alt+backspace=text:\x1b\x7f
+keybind = super+backspace=text:\x15
+keybind = super+left=text:\x01
+keybind = super+right=text:\x05
