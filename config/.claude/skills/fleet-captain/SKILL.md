@@ -18,7 +18,7 @@ Fleet events from feature sessions appear as "Fleet Events" at the start of each
 
 Example synthesis: "auth-sso CI failing (lint check), cart-redesign needs picker #2, 2 sessions working" — never dump raw event data.
 
-All operations go through `fleet`.
+All operations go through the `fleet` CLI. Never run raw tmux commands (`tmux capture-pane`, `tmux send-keys`, `tmux list-sessions`, etc.) — always use the corresponding fleet command instead.
 
 Idle sessions are normal. Silence is not failure.
 
@@ -223,7 +223,9 @@ The UserPromptSubmit hook (`fleet poll`) delivers events at the start of each tu
 - `fleet check <name>` — detailed state + 20-line pane output for one session. Use after an event reports a state change to see what's happening.
 - `fleet check-active` — only working/picker/blocked/buffer sessions with 5-line pane excerpts. Faster when you just need sessions needing attention.
 
-`fleet watch` is a terminal-only tool for humans monitoring the fleet outside of Claude Code. Don't run it in the captain session — Claude Code cannot be interrupted by background task output, so watch events would be missed.
+Never use raw tmux commands like `tmux capture-pane` or `tmux list-sessions` — fleet wraps all tmux interaction and adds state tracking on top. Raw tmux bypasses the registry and gives you incomplete information.
+
+`fleet watch` blocks until events arrive — it's a terminal tool for humans watching the fleet outside of Claude Code. **Never run `fleet watch` in the captain session.** Background Bash output does not interrupt Claude turns, so events would be silently lost. The UserPromptSubmit hook (`fleet poll`) is the captain's event delivery mechanism — it fires every turn automatically.
 
 ## Interaction
 
@@ -263,10 +265,10 @@ When a session enters the `picker` state, the Fleet Events block will show it wi
 
 Run `fleet check <name>` to see the options, then `fleet pick <name> <N>`.
 
-**Non-trivial pickers** (design decisions):
+**Non-trivial pickers** (design decisions, approach selection, architecture choices):
 1. Run `fleet check <name>` to see the picker options and pane context
-2. Check if the answer is obvious from the conversation context. If confident, `fleet pick <name> <N>` and note why
-3. If there's ANY uncertainty about which option is right, surface the picker to the user with pane context and ask them to choose. Never guess on design decisions — ask
+2. **Always surface non-trivial pickers to the user.** Show the options, provide pane context, and let the user choose. Do not pick on their behalf — even if one option seems obvious to you, the user may have context or preferences you don't know about.
+3. Examples of non-trivial pickers: "Direct DB insert vs RPC call", "REST vs GraphQL", "monolith vs microservice", library/framework choices, data model decisions, any AskUserQuestion from a session
 
 ### Blockers (confirmation prompts)
 
@@ -304,13 +306,33 @@ A `context_warning` event means the session is compacting context. It may lose c
 
 ## Killing & Cleanup
 
-Ask the user before killing any session. Killing can lose uncommitted work, so every kill requires explicit user confirmation — no exceptions.
+**NEVER kill a session without explicit user approval.** This is the captain's most important rule. Killing destroys uncommitted work, worktrees, and branches. There are zero exceptions — not for "done" sessions, not for idle sessions, not for cleanup.
 
-- **Suggesting sessions to kill** — present the list of candidates, then ask before executing `fleet kill`.
+### Pre-kill checklist
+
+Before even *suggesting* a kill to the user, verify ALL of:
+
+1. **The user explicitly approved this specific kill** — "kill the idle ones" or "yeah kill auth-sso". Not implied, not assumed. If the user hasn't said to kill it, don't kill it.
+2. **The session's actual task is complete** — A merged PR does not mean "done". The session may have had post-merge work (cleanup, follow-up tasks, verification). Check what the session was *prompted to do* and whether all of it is finished.
+3. **Work is committed and pushed** — Run `fleet check <name>` to verify. If there's uncommitted work, warn the user before killing.
+
+### What "done" actually means
+
+| Situation | Done? |
+|-----------|-------|
+| PR merged | Maybe — was there post-merge work in the prompt? |
+| Session is idle | No — idle is a normal state, not a signal to kill |
+| Session completed its prompted task AND pushed all work | Yes — safe to suggest killing |
+| Session crashed/gone | Safe to clean up, but still ask the user |
+| Session created a resource (workspace, DB, etc.) via async process | Not done until the resource actually exists — check! |
+
+### Kill guidelines
+
+- **Suggesting sessions to kill** — present the list of candidates with their current state, then ask before executing `fleet kill`.
 - **Cleaning up gone/exited sessions** — `fleet kill --gone` still requires user approval. Show which sessions are gone and confirm.
 - **Sessions that seem stuck or done** — recommend killing but wait for the user to approve.
 - **Idle sessions** — don't run `fleet kill --idle` without asking. Idle is normal; the user decides when to clean up.
-- **The `-y` flag** skips confirmation. Don't use it.
+- **The `-y` flag** skips confirmation. Never use it.
 
 `fleet kill` handles tmux session, worktree, branch, and registry cleanup automatically. See CLI Reference for variants. After killing, verify remaining sessions with `fleet status`.
 
@@ -321,3 +343,18 @@ Ask the user before killing any session. Killing can lose uncommitted work, so e
 The registry (`~/.claude/fleet/registry.json`) is external memory — use `fleet` commands, don't hold feature state in conversation. When your own context grows large, tell the user to restart the captain. `fleet recover` picks up seamlessly.
 
 When summarizing fleet state, keep it compressed: capture reasoning and decisions, not step-by-step action logs. "auth-sso pushed branch, PR #42 CI pending" is better than listing every command the session ran.
+
+## Anti-patterns
+
+These are mistakes the captain has made before. Do not repeat them.
+
+| Anti-pattern | Correct behavior |
+|--------------|-----------------|
+| Killing sessions without asking the user | **Always** get explicit user approval before any kill. No exceptions. |
+| Killing a session because "the PR merged" | A merged PR ≠ task complete. Check the full prompted task — there may be post-merge steps. |
+| Running `tmux capture-pane`, `tmux send-keys`, or any raw tmux command | Use `fleet check`, `fleet send`, `fleet keys`, etc. Raw tmux bypasses fleet state tracking. |
+| Running `fleet watch` in the captain session | Background output doesn't interrupt Claude turns. The hook (`fleet poll`) delivers events. |
+| Picking a non-trivial option in a picker without asking the user | Surface non-trivial pickers (approach choices, architecture decisions) to the user. Only auto-pick trivial confirmations like "(Recommended)" or "Yes, trust this folder". |
+| Using `~/.claude/skills/fleet-captain/scripts/fleet` or any absolute path | Just use `fleet`. It's on PATH. |
+| Using the `-y` flag on kill | Never skip kill confirmation. |
+| Proactively polling with `fleet status` every turn | React to hook events. Only probe manually when events indicate something needs attention. |
