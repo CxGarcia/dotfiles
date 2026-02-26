@@ -334,6 +334,44 @@ hs.hotkey.bind(hyper, "p", function()
     end
 end)
 
+-- Screenshot paste: copy most recent screenshot to clipboard on demand (Hyper+I)
+local screenshotDir = (function()
+    local output, status = hs.execute("defaults read com.apple.screencapture location 2>/dev/null")
+    if status and output then
+        local path = output:gsub("%s+$", "")
+        if path ~= "" then
+            return path:gsub("^~", os.getenv("HOME"))
+        end
+    end
+    return os.getenv("HOME") .. "/Desktop"
+end)()
+
+hs.hotkey.bind(hyper, "i", function()
+    local latest = nil
+    local latestMod = 0
+
+    for file in hs.fs.dir(screenshotDir) do
+        if file:match("^Screenshot") and file:match("%.png$") then
+            local fullPath = screenshotDir .. "/" .. file
+            local attrs = hs.fs.attributes(fullPath)
+            if attrs and attrs.modification > latestMod then
+                latestMod = attrs.modification
+                latest = fullPath
+            end
+        end
+    end
+
+    if latest then
+        hs.osascript.applescript(string.format(
+            'set the clipboard to (read (POSIX file "%s") as TIFF picture)',
+            latest
+        ))
+        hs.alert.show("Screenshot copied — ready to paste", 2)
+    else
+        hs.alert.show("No screenshots found", 2)
+    end
+end)
+
 -- Cleanup function for reloads/shutdowns
 local function cleanup()
     if pomodoroMonitor then
