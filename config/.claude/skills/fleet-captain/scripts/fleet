@@ -211,17 +211,25 @@ async function sessionExists(target: string): Promise<boolean> {
   return result.exitCode === 0
 }
 
+async function isClaudeReady(target: string): Promise<boolean> {
+  const cmd = await tmuxGet(target, FMT_CMD)
+  if (cmd !== "claude") return false
+  const content = (await $`tmux capture-pane -t ${target} -p -S -5`.quiet().nothrow()).text()
+  if (/ctrl.c to interrupt|tokens/.test(content)) return false
+  const title = await tmuxGet(target, "#{pane_title}")
+  if (title.startsWith("✳")) return true
+  return content.includes("❯")
+}
+
 async function waitForReady(session: string, maxWait = 120): Promise<boolean> {
   const target = `${session}:claude`
+  let consecutiveReady = 0
   for (let elapsed = 0; elapsed < maxWait * 1000; elapsed += 500) {
-    const cmd = await tmuxGet(target, FMT_CMD)
-    if (cmd === "claude") {
-      const title = await tmuxGet(target, "#{pane_title}")
-      if (title.startsWith("✳")) return true
-      const content = (await $`tmux capture-pane -t ${target} -p -S -5`.quiet().nothrow()).text()
-      const hasPrompt = content.includes("❯")
-      const hasSpinner = /ctrl.c to interrupt|tokens/.test(content)
-      if (hasPrompt && !hasSpinner) return true
+    if (await isClaudeReady(target)) {
+      consecutiveReady++
+      if (consecutiveReady >= 2) return true
+    } else {
+      consecutiveReady = 0
     }
     await Bun.sleep(500)
   }
@@ -502,7 +510,29 @@ fleet.command("spawn")
 
     if (description) {
       await tmuxSend(sessionName, description)
-      console.log(`PROMPT_SENT: ${description}`)
+
+      const target = `${sessionName}:claude`
+      let promptAccepted = false
+      for (let retry = 0; retry < 5; retry++) {
+        for (let i = 0; i < 25; i++) {
+          const { state } = await checkSessionState(target, 5)
+          if (state === "working") { promptAccepted = true; break }
+          if (state === "idle" && i >= 3) { promptAccepted = true; break }
+          await Bun.sleep(200)
+        }
+        if (promptAccepted) break
+        const { state: confirmState } = await checkSessionState(target, 5)
+        if (confirmState !== "buffer") { promptAccepted = true; break }
+        console.log(`RETRY_ENTER: attempt ${retry + 1}`)
+        await $`tmux send-keys -t ${target} Enter`.quiet()
+      }
+
+      if (promptAccepted) {
+        console.log(`PROMPT_SENT: ${description}`)
+      } else {
+        console.error(`WARN: Prompt may not have been accepted after retries`)
+        console.log(`PROMPT_SENT: ${description}`)
+      }
     }
 
     const reg = readRegistry()
