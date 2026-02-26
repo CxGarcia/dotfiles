@@ -622,6 +622,8 @@ fleet.command("status")
   .description("Snapshot of all active features with live state and pane content")
   .option("--tag <tag>", "Filter by tag")
   .option("--scope <scope>", "Filter by scope (research, implement, any)")
+  .option("--dump", "Include full pane output for every session")
+  .option("--lines <n>", "Lines of scrollback to capture with --dump (default: 100)", "100")
   .action(async (opts) => {
     const reg = readRegistry()
     let active = Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
@@ -641,10 +643,19 @@ fleet.command("status")
       console.log(`${row.name}\t${row.state}\t${row.repo}\t${row.branch}\t${row.pr}\t${row.ci}\t${row.title}`)
     }
 
-    for (const row of rows) {
-      if (row.paneContent) {
-        console.log(`\nPANE:${row.name}`)
-        console.log(row.paneContent)
+    if (opts.dump) {
+      const dumpLines = parseInt(opts.lines)
+      for (const row of rows) {
+        const output = await capturePaneOutput(row.tmuxTarget.replace(/:claude$/, ""), dumpLines)
+        console.log(`\n=== ${row.name} (${row.state}) ===`)
+        console.log(output || "(no output)")
+      }
+    } else {
+      for (const row of rows) {
+        if (row.paneContent) {
+          console.log(`\nPANE:${row.name}`)
+          console.log(row.paneContent)
+        }
       }
     }
 

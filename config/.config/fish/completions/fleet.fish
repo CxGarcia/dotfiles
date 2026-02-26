@@ -27,6 +27,10 @@ complete -c fleet -n '__fish_use_subcommand' -a 'share' -d 'Share a file with mu
 complete -c fleet -n '__fish_use_subcommand' -a 'install' -d 'Install fleet to ~/.local/bin'
 complete -c fleet -n '__fish_use_subcommand' -a 'uninstall' -d 'Remove fleet from ~/.local/bin'
 
+# Status flags
+complete -c fleet -n '__fish_seen_subcommand_from status' -l dump -d 'Include full pane output for every session'
+complete -c fleet -n '__fish_seen_subcommand_from status' -l lines -d 'Lines of scrollback with --dump' -r
+
 # Feature name completions for commands that take a feature argument
 complete -c fleet -n '__fish_seen_subcommand_from check' -a '(__fleet_features)'
 complete -c fleet -n '__fish_seen_subcommand_from pr' -a '(__fleet_features)'
