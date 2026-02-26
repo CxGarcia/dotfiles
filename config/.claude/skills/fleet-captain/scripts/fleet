@@ -93,32 +93,31 @@ function activeFeatures(): [string, Feature][] {
   return Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
 }
 
-async function killFeature(name: string) {
-  const feat = getFeature(name)
+async function killFeature(name: string, reg?: Registry): Promise<Registry | void> {
+  const owned = !reg
+  if (!reg) reg = readRegistry()
+  const feat = reg.features[name]
   if (!feat) {
     console.log(`SKIP: Feature '${name}' not found`)
     return
   }
   const { tmuxSessionId: sid, tmuxSession: sname, repo, worktreePath, branch } = feat
 
-  let target: string | null = null
-  if (await sessionExists(sid)) target = sid
-  else if (await sessionExists(sname)) target = sname
+  const [sidExists, snameExists] = await Promise.all([sessionExists(sid), sessionExists(sname)])
+  const target = sidExists ? sid : snameExists ? sname : null
   if (target) {
-    await $`tmux send-keys -t ${target} C-c`.quiet().nothrow()
-    await Bun.sleep(1000)
-    await $`tmux send-keys -t ${target} -l /exit`.quiet().nothrow()
-    await $`tmux send-keys -t ${target} Enter`.quiet().nothrow()
-    await Bun.sleep(2000)
     await $`tmux kill-session -t ${target}`.quiet().nothrow()
     console.log(`SESSION_KILLED: ${sname}`)
   } else {
     console.log(`SESSION_ALREADY_GONE: ${sname}`)
   }
 
+  const cleanup: Promise<void>[] = []
+
   if (worktreePath && existsSync(worktreePath)) {
-    await $`git -C ${repo} worktree remove --force ${worktreePath}`.quiet().nothrow()
-    console.log(`WORKTREE_REMOVED: ${worktreePath}`)
+    cleanup.push($`git -C ${repo} worktree remove --force ${worktreePath}`.quiet().nothrow().then(() => {
+      console.log(`WORKTREE_REMOVED: ${worktreePath}`)
+    }))
   }
 
   if (branch) {
@@ -126,13 +125,13 @@ async function killFeature(name: string) {
     if (protectedBranches.has(branch)) {
       console.log(`BRANCH_PROTECTED: ${branch} (not deleted)`)
     } else {
-      const branchExists = await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()
-      if (branchExists.exitCode === 0) {
-        await $`git -C ${repo} branch -D ${branch}`.quiet().nothrow()
-        console.log(`BRANCH_DELETED: ${branch}`)
-      }
+      cleanup.push($`git -C ${repo} branch -D ${branch}`.quiet().nothrow().then(r => {
+        if (r.exitCode === 0) console.log(`BRANCH_DELETED: ${branch}`)
+      }))
     }
   }
+
+  await Promise.all(cleanup)
 
   for (const prefix of ["teams", "tasks"]) {
     const dir = join(HOME, ".claude", prefix)
@@ -143,9 +142,13 @@ async function killFeature(name: string) {
     }
   }
 
-  updateFeature(name, { status: "abandoned" })
+  Object.assign(reg.features[name], { status: "abandoned", updatedAt: ts() })
+  reg.updated = ts()
   logEvent(name, "abandoned")
   console.log(`DONE: ${name} abandoned and cleaned up`)
+
+  if (owned) writeRegistry(reg)
+  return reg
 }
 
 function readRepos(): Record<string, string> {
@@ -1436,9 +1439,15 @@ fleet.command("kill")
       }
     }
 
-    for (const name of targets) {
-      if (targets.length > 1) console.log(`\n--- killing ${name} ---`)
-      await killFeature(name)
+    if (targets.length === 1) {
+      await killFeature(targets[0])
+    } else {
+      const reg = readRegistry()
+      await Promise.all(targets.map(async name => {
+        console.log(`\n--- killing ${name} ---`)
+        await killFeature(name, reg)
+      }))
+      writeRegistry(reg)
     }
   })
 
