@@ -8,7 +8,7 @@ font-feature = -calt
 font-thicken = true
 font-thicken-strength = 200
 adjust-cell-height = 5%
-adjust-cell-width = -2%
+adjust-cell-width = 0
 
 background = #252C33
 foreground = #DCDCDC
@@ -55,7 +55,3 @@ shell-integration-features = no-cursor,sudo,title
 
 keybind = super+left=text:\x1b[H
 keybind = super+right=text:\x1b[F
-keybind = super+shift+left=text:\x1b[1;3D
-keybind = super+shift+right=text:\x1b[1;3C
-keybind = super+shift+up=text:\x1b[1;3A
-keybind = super+shift+down=text:\x1b[1;3B
