@@ -508,41 +508,36 @@ fleet.command("spawn")
     const sessionId = await tmuxGet(sessionName, FMT_SESSION_ID)
     console.log(`SESSION_CREATED: ${sessionName} (id: ${sessionId})`)
 
-    await tmuxSend(sessionName, "claude --dangerously-skip-permissions")
-
-    console.log("WAITING_FOR_CLAUDE...")
-    if (!await waitForReady(sessionName, 120)) {
-      console.error(`ERROR: Claude did not become ready within 120s`)
-      console.error(`SESSION: ${sessionName} (you can attach manually)`)
-      process.exit(1)
-    }
-    console.log("CLAUDE_READY")
-
     if (description) {
-      await tmuxSend(sessionName, description)
+      // Pass prompt as CLI argument — Claude auto-submits it on start,
+      // avoiding the paste-into-TUI + Enter race condition entirely
+      const quoted = "'" + description.replace(/'/g, "'\\''") + "'"
+      await tmuxSend(sessionName, `claude --dangerously-skip-permissions -- ${quoted}`)
 
+      // Verify Claude started (it will already be processing the prompt)
       const target = `${sessionName}:claude`
-      let promptAccepted = false
-      for (let retry = 0; retry < 5; retry++) {
-        for (let i = 0; i < 25; i++) {
-          const { state } = await checkSessionState(target, 5)
-          if (state === "working") { promptAccepted = true; break }
-          if (state === "idle" && i >= 3) { promptAccepted = true; break }
-          await Bun.sleep(200)
-        }
-        if (promptAccepted) break
-        const { state: confirmState } = await checkSessionState(target, 5)
-        if (confirmState !== "buffer") { promptAccepted = true; break }
-        console.log(`RETRY_ENTER: attempt ${retry + 1}`)
-        await $`tmux send-keys -t ${target} Enter`.quiet()
+      let started = false
+      for (let elapsed = 0; elapsed < 30_000; elapsed += 500) {
+        const cmd = await tmuxGet(target, FMT_CMD)
+        if (cmd === "claude") { started = true; break }
+        await Bun.sleep(500)
       }
+      if (!started) {
+        console.error(`ERROR: Claude did not start within 30s`)
+        console.error(`SESSION: ${sessionName} (you can attach manually)`)
+        process.exit(1)
+      }
+      console.log(`PROMPT_SUBMITTED: ${description}`)
+    } else {
+      await tmuxSend(sessionName, "claude --dangerously-skip-permissions")
 
-      if (promptAccepted) {
-        console.log(`PROMPT_SENT: ${description}`)
-      } else {
-        console.error(`WARN: Prompt may not have been accepted after retries`)
-        console.log(`PROMPT_SENT: ${description}`)
+      console.log("WAITING_FOR_CLAUDE...")
+      if (!await waitForReady(sessionName, 120)) {
+        console.error(`ERROR: Claude did not become ready within 120s`)
+        console.error(`SESSION: ${sessionName} (you can attach manually)`)
+        process.exit(1)
       }
+      console.log("CLAUDE_READY")
     }
 
     const reg = readRegistry()
