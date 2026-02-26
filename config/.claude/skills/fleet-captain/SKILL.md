@@ -18,7 +18,7 @@ Fleet events from feature sessions appear as "Fleet Events" at the start of each
 
 Example synthesis: "auth-sso CI failing (lint check), cart-redesign needs picker #2, 2 sessions working" — never dump raw event data.
 
-All operations go through the `fleet` CLI. Never run raw tmux commands (`tmux capture-pane`, `tmux send-keys`, `tmux list-sessions`, etc.) — always use the corresponding fleet command instead.
+Always prefer the `fleet` CLI over raw tmux commands. If you need to do something fleet doesn't support, raise it to the user — it may be worth adding as a fleet command. Only use raw tmux as a last resort, and mention to the user that this could become a fleet feature.
 
 Idle sessions are normal. Silence is not failure.
 
@@ -223,7 +223,7 @@ The UserPromptSubmit hook (`fleet poll`) delivers events at the start of each tu
 - `fleet check <name>` — detailed state + 20-line pane output for one session. Use after an event reports a state change to see what's happening.
 - `fleet check-active` — only working/picker/blocked/buffer sessions with 5-line pane excerpts. Faster when you just need sessions needing attention.
 
-Never use raw tmux commands like `tmux capture-pane` or `tmux list-sessions` — fleet wraps all tmux interaction and adds state tracking on top. Raw tmux bypasses the registry and gives you incomplete information.
+Prefer fleet commands over raw tmux — fleet wraps tmux interaction and adds state tracking on top. If you need something fleet doesn't cover, tell the user so we can assess adding it as a fleet command. Only fall back to raw tmux as a last resort, and flag it as a potential fleet feature.
 
 `fleet watch` blocks until events arrive — it's a terminal tool for humans watching the fleet outside of Claude Code. **Never run `fleet watch` in the captain session.** Background Bash output does not interrupt Claude turns, so events would be silently lost. The UserPromptSubmit hook (`fleet poll`) is the captain's event delivery mechanism — it fires every turn automatically.
 
@@ -352,7 +352,7 @@ These are mistakes the captain has made before. Do not repeat them.
 |--------------|-----------------|
 | Killing sessions without asking the user | **Always** get explicit user approval before any kill. No exceptions. |
 | Killing a session because "the PR merged" | A merged PR ≠ task complete. Check the full prompted task — there may be post-merge steps. |
-| Running `tmux capture-pane`, `tmux send-keys`, or any raw tmux command | Use `fleet check`, `fleet send`, `fleet keys`, etc. Raw tmux bypasses fleet state tracking. |
+| Using raw tmux commands without trying fleet first | Prefer `fleet check`, `fleet send`, `fleet keys`, etc. If fleet doesn't support what you need, raise it to the user as a potential fleet feature before falling back to raw tmux. |
 | Running `fleet watch` in the captain session | Background output doesn't interrupt Claude turns. The hook (`fleet poll`) delivers events. |
 | Picking a non-trivial option in a picker without asking the user | Surface non-trivial pickers (approach choices, architecture decisions) to the user. Only auto-pick trivial confirmations like "(Recommended)" or "Yes, trust this folder". |
 | Using `~/.claude/skills/fleet-captain/scripts/fleet` or any absolute path | Just use `fleet`. It's on PATH. |
