@@ -85,8 +85,8 @@ local sessionPickerTap = (function()
         local keyCode = event:getKeyCode()
         local isCtrlA = flags.ctrl and not flags.cmd and not flags.alt and not flags.shift and keyCode == 0
 
-        local terminal = hs.application.find('Ghostty')
-        if terminal and terminal:isFrontmost() then
+        local ghostty = hs.application.find('Ghostty')
+        if ghostty and ghostty:isFrontmost() then
             reset()
             return false
         end
@@ -94,8 +94,8 @@ local sessionPickerTap = (function()
         if isCtrlA then
             if waitingForSecond then
                 reset()
-                if terminal then
-                    terminal:activate()
+                if ghostty then
+                    ghostty:activate()
                 else
                     hs.application.launchOrFocus('Ghostty')
                 end

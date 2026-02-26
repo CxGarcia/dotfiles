@@ -1,7 +1,5 @@
-# Shell (ensure fish regardless of SHELL env var)
 command = /opt/homebrew/bin/fish
 
-# Font (FiraCode Nerd Font Mono, matching iTerm2 profile)
 font-family = FiraCode Nerd Font Mono
 font-style = SemBd
 font-style-bold = Bold
@@ -12,7 +10,6 @@ font-thicken-strength = 200
 adjust-cell-height = 5%
 adjust-cell-width = -2%
 
-# Colors (custom Rose Pine dark, matching iTerm2 background)
 background = #252C33
 foreground = #DCDCDC
 cursor-color = #82BCBD
@@ -20,7 +17,6 @@ cursor-text = #000000
 selection-background = #BAD5FB
 selection-foreground = #000000
 
-# ANSI palette (carried over from iTerm2 profile)
 palette = 0=#121315
 palette = 1=#B43C29
 palette = 2=#00C200
@@ -38,31 +34,25 @@ palette = 13=#E17DE1
 palette = 14=#60FDFF
 palette = 15=#FFFFFF
 
-# Cursor
 cursor-style = block
 cursor-style-blink = true
 
-# Window
 window-padding-x = 8
 window-padding-y = 4
 window-padding-color = extend
 window-save-state = always
 minimum-contrast = 1
 
-# macOS
 macos-titlebar-style = tabs
 macos-option-as-alt = true
 macos-non-native-fullscreen = true
 
-# Mouse
 mouse-hide-while-typing = true
 copy-on-select = true
 clipboard-trim-trailing-spaces = true
 
-# Shell integration (fish auto-detected, no-cursor preserves block cursor at prompt)
 shell-integration-features = no-cursor,sudo,title
 
-# Keybindings: word navigation (replicates iTerm2 keybindings)
 keybind = alt+left=text:\x1bb
 keybind = alt+right=text:\x1bf
 keybind = alt+backspace=text:\x1b\x7f
