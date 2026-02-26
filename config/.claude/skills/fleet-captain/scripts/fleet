@@ -223,14 +223,7 @@ async function tmuxSend(session: string, text: string) {
   // Brief delay to let the TUI finish processing the paste before Enter
   await Bun.sleep(50)
 
-  // Send Enter and retry if text stays stuck in the buffer
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await $`tmux send-keys -t ${target} Enter`.quiet()
-    await Bun.sleep(150)
-    const { state } = await checkSessionState(target, 3)
-    if (state !== "buffer") return
-    await Bun.sleep(100)
-  }
+  await $`tmux send-keys -t ${target} Enter`.quiet()
 }
 
 async function sessionExists(target: string): Promise<boolean> {
@@ -292,12 +285,9 @@ async function checkSessionState(target: string, captureLines = 20): Promise<{ s
   // false-positive on fleet output that includes other sessions' picker text)
   if (/Enter to select|Enter to confirm|Space to select|to navigate/.test(tail)) return { state: "picker", content }
 
-  // If pane_title says idle, check for unsubmitted text in the input buffer
-  // The ❯ prompt line isn't always the very last line — Claude Code renders
-  // separator and mode-indicator lines below it, so check the tail per-line
+  // pane_title says idle — auto-suggestion text on the ❯ prompt line is just
+  // Claude Code's UI hint, not user input, so we report plain "idle".
   if (title.startsWith("✳")) {
-    const hasBuffer = lines.slice(-5).some(l => /^\s*❯\s+\S/.test(l))
-    if (hasBuffer) return { state: "buffer", content }
     return { state: "idle", content }
   }
 
@@ -707,7 +697,7 @@ fleet.command("check")
   })
 
 fleet.command("check-active")
-  .description("State of all working/picker/blocked/buffer sessions with pane excerpts")
+  .description("State of all working/picker/blocked sessions with pane excerpts")
   .action(async () => {
     const features = activeFeatures()
     if (features.length === 0) {
@@ -716,7 +706,7 @@ fleet.command("check-active")
     }
 
     const allRows = await buildStatusRows(features)
-    const rows = allRows.filter(r => ["working", "picker", "blocked", "buffer"].includes(r.state))
+    const rows = allRows.filter(r => ["working", "picker", "blocked"].includes(r.state))
 
     if (rows.length === 0) {
       console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
@@ -893,7 +883,7 @@ interface WatchEvent {
 
 function watchEventPriority(type: string, state?: string): number {
   if (type === "state_change") {
-    if (state === "picker" || state === "blocked" || state === "buffer") return 0
+    if (state === "picker" || state === "blocked") return 0
     if (state === "idle" || state === "gone" || state === "exited" || state?.startsWith("crashed")) return 1
     if (state === "working") return 2
     return 3
@@ -1043,7 +1033,6 @@ fleet.command("watch")
           if (e.type === "state_change") {
             const hint = e.to === "picker" ? `fleet pick ${e.feature} <N>` :
                          e.to === "blocked" ? `fleet keys ${e.feature} y/n` :
-                         e.to === "buffer" ? `fleet check ${e.feature}` :
                          e.to === "idle" ? `fleet check ${e.feature}` :
                          e.to === "gone" || e.to === "exited" ? `fleet kill --gone` :
                          e.to?.startsWith("crashed") ? `fleet check ${e.feature}` : ""
@@ -1311,12 +1300,11 @@ fleet.command("poll")
       if (previous && previous !== current) {
         const hint = current === "picker" ? ` — fleet pick ${name} <N>` :
                      current === "blocked" ? ` — fleet keys ${name} y/n` :
-                     current === "buffer" ? ` — fleet check ${name}` :
                      current === "gone" || current === "exited" ? ` — fleet kill --gone` :
                      current?.startsWith("crashed") ? ` — fleet check ${name}` : ""
         output.push(`  ${name}: ${previous} → ${current}${hint}`)
         eventCount++
-        if (["picker", "blocked", "buffer"].includes(current) && content) {
+        if (["picker", "blocked"].includes(current) && content) {
           for (const line of content.split("\n").slice(-5)) {
             output.push(`    │ ${line}`)
           }
@@ -1729,7 +1717,7 @@ fleet.command("install")
         ["spawn", "Create a new feature session"],
         ["status", "Snapshot of all active features"],
         ["check", "Detailed state of one feature"],
-        ["check-active", "State of working/picker/blocked/buffer sessions"],
+        ["check-active", "State of working/picker/blocked sessions"],
         ["pr", "Monitor PR: CI, reviews, comments, merge state"],
         ["poll", "Non-blocking event + state check (used by hooks)"],
         ["send", "Send text to a session"],
