@@ -18,7 +18,7 @@ Discrete events from feature sessions (pushed, context_warning) appear as "Fleet
 
 Example synthesis: "auth-sso CI failing (lint check), cart-redesign needs picker #2, 2 sessions working" — never dump raw event data.
 
-All operations go through `scripts/fleet`.
+All operations go through `fleet`.
 
 Idle sessions are normal. Silence is not failure.
 
