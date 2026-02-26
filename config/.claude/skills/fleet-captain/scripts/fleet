@@ -174,10 +174,10 @@ async function tmuxGet(target: string, fmt: string): Promise<string> {
 }
 
 async function waitForPaneContent(target: string, pattern: string, maxWait = 10): Promise<boolean> {
-  const fmt = `#{C/r:${pattern}}`
+  const regex = new RegExp(pattern)
   for (let elapsed = 0; elapsed < maxWait * 1000; elapsed += 200) {
-    const line = (await $`tmux display-message -t ${target} -p ${fmt}`.quiet().nothrow()).text().trim()
-    if (line !== "0") return true
+    const content = (await $`tmux capture-pane -t ${target} -p`.quiet().nothrow()).text()
+    if (regex.test(content)) return true
     await Bun.sleep(200)
   }
   return false
@@ -198,12 +198,22 @@ async function tmuxSend(session: string, text: string) {
     try { unlinkSync(tmpFile) } catch {}
   }
 
-  // Verify text appeared before sending Enter. Use a short tail probe (avoids line-wrap splits)
-  // and fall back to head probe since paste-buffer delivery is atomic (head present = all present)
+  // Verify text appeared before sending Enter
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   const tailOk = text.length > 200 && await waitForPaneContent(target, esc(text.slice(-20)), 5)
   if (!tailOk) await waitForPaneContent(target, esc(text.slice(0, 40)), 5)
-  await $`tmux send-keys -t ${target} Enter`.quiet()
+
+  // Brief delay to let the TUI finish processing the paste before Enter
+  await Bun.sleep(50)
+
+  // Send Enter and retry if text stays stuck in the buffer
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await $`tmux send-keys -t ${target} Enter`.quiet()
+    await Bun.sleep(150)
+    const { state } = await checkSessionState(target, 3)
+    if (state !== "buffer") return
+    await Bun.sleep(100)
+  }
 }
 
 async function sessionExists(target: string): Promise<boolean> {
