@@ -1741,6 +1741,7 @@ fleet.command("install")
         ["recover", "Reconcile registry after restart"],
         ["prune", "Trim events.jsonl"],
         ["desc", "Update feature description"],
+        ["capture", "Capture pane output from sessions in parallel"],
         ["relay", "Relay output from one session to another"],
         ["share", "Share a file with multiple sessions"],
         ["repos", "Manage repo shortname index"],
@@ -1756,7 +1757,7 @@ fleet.command("install")
         ...subcommands.map(([cmd, desc]) => `complete -c fleet -n '__fish_use_subcommand' -a '${cmd}' -d '${desc}'`),
         "",
         "# Feature name completions for commands that take a feature argument",
-        ...["check", "pr", "send", "kill", "pick", "keys", "desc", "relay"].map(
+        ...["check", "pr", "send", "kill", "pick", "keys", "desc", "capture", "relay"].map(
           cmd => `complete -c fleet -n '__fish_seen_subcommand_from ${cmd}' -a '(__fleet_features)'`
         ),
       ]
@@ -1794,6 +1795,55 @@ fleet.command("uninstall")
 async function capturePaneOutput(session: string, lines = 50): Promise<string> {
   return (await $`tmux capture-pane -t ${session}:claude -p -S -${lines}`.quiet().nothrow()).text().trim()
 }
+
+fleet.command("capture")
+  .description("Capture pane output from one or more sessions in parallel")
+  .argument("[sessions...]", "Session names to capture")
+  .option("--all", "Capture all active sessions")
+  .option("-S <start>", "Start line (negative for scrollback, e.g. -100)")
+  .option("-E <end>", "End line")
+  .option("-J", "Join wrapped lines")
+  .option("-e", "Include escape sequences")
+  .option("-N", "Preserve trailing spaces")
+  .option("-q", "Quiet mode")
+  .action(async (sessions: string[], opts) => {
+    let targets: [string, Feature][]
+    if (opts.all) {
+      targets = activeFeatures()
+    } else if (sessions.length > 0) {
+      targets = sessions.map(name => [name, requireFeature(name)])
+    } else {
+      console.error("ERROR: Provide session names or use --all")
+      process.exit(1)
+    }
+
+    if (targets.length === 0) {
+      console.log("NO_MATCHING_SESSIONS")
+      return
+    }
+
+    const captureArgs: string[] = ["-p"]
+    if (opts.S) captureArgs.push("-S", opts.S)
+    else captureArgs.push("-S", "-50")
+    if (opts.E) captureArgs.push("-E", opts.E)
+    if (opts.J) captureArgs.push("-J")
+    if (opts.e) captureArgs.push("-e")
+    if (opts.N) captureArgs.push("-N")
+    if (opts.q) captureArgs.push("-q")
+
+    const results = await Promise.all(
+      targets.map(async ([name, feat]) => {
+        const args = ["capture-pane", "-t", `${feat.tmuxSession}:claude`, ...captureArgs]
+        const result = await $`tmux ${args}`.quiet().nothrow()
+        return { name, output: result.text().trim() }
+      })
+    )
+
+    for (const { name, output } of results) {
+      console.log(`=== ${name} ===`)
+      console.log(output || "(no output)")
+    }
+  })
 
 fleet.command("relay")
   .description("Capture output from one session and send it to another with context")
