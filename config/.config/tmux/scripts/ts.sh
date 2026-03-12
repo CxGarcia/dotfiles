@@ -69,7 +69,7 @@ list_sessions() {
 case "${1:-}" in
     --list)     list_sessions; exit 0 ;;
     --list-dirs)
-        { zoxide query -l 2>/dev/null; find "$HOME/dev" -maxdepth 1 -mindepth 1 -type d 2>/dev/null; } | awk -v home="$HOME" '!seen[$0]++ { display=$0; sub("^"home, "~", display); printf "\t%s\t%s\n", $0, display }'
+        { zoxide query -l 2>/dev/null; find "$HOME/dev" -maxdepth 1 -mindepth 1 -type d 2>/dev/null; } | awk -v home="$HOME" '!seen[$0]++ { display=$0; sub("^"home, "~", display); printf "_dir_\t%s\t%s\n", $0, display }'
         exit 0 ;;
     --kill)
         [[ -z "${2:-}" || "$2" == "${3:-}" ]] && exit 0
@@ -121,6 +121,30 @@ else
     name="$query"
 fi
 [[ -z "$target" && -z "$name" ]] && exit 0
+
+# Directory picked from zoxide list -- create new workspace
+if [[ "$target" == "_dir_" ]]; then
+    if [[ -d "$name" ]]; then
+        work_dir="$name"
+    else
+        work_dir=$(zoxide query "$name" 2>/dev/null || echo "$HOME")
+    fi
+
+    base_name="${work_dir##*/}"
+    base_name="${base_name//./_}"
+    session_name="$base_name"
+    n=2
+    while tmux has-session -t="$session_name" 2>/dev/null; do
+        session_name="${base_name}-${n}"
+        n=$((n + 1))
+    done
+    tmux new-session -d -s "$session_name" -n "claude" -c "$work_dir"
+    tmux set-option -t "$session_name" @claude_task "${work_dir##*/}"
+    tmux send-keys -t "$session_name:=claude" "claude --dangerously-skip-permissions" C-m
+    zoxide add "$work_dir" 2>/dev/null
+    go_to_session "$session_name:=claude" "$session_name"
+    exit 0
+fi
 
 # Existing session -- switch using stable session ID
 if [[ -n "$target" ]]; then
