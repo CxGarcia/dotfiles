@@ -205,12 +205,13 @@ async function tmuxSend(session: string, text: string) {
   await $`tmux send-keys -t ${target} C-u`.quiet()
 
   // Use load-buffer + paste-buffer instead of send-keys -l which truncates at ~1024 bytes
+  // -p enables bracketed paste mode to prevent escape sequence injection
   const bufName = `fleet_${Date.now()}`
   const tmpFile = `/tmp/${bufName}.txt`
   await Bun.write(tmpFile, text)
   try {
     await $`tmux load-buffer -b ${bufName} ${tmpFile}`.quiet()
-    await $`tmux paste-buffer -t ${target} -b ${bufName} -d`.quiet()
+    await $`tmux paste-buffer -t ${target} -b ${bufName} -d -p`.quiet()
   } finally {
     try { unlinkSync(tmpFile) } catch {}
   }
@@ -229,6 +230,35 @@ async function tmuxSend(session: string, text: string) {
 async function sessionExists(target: string): Promise<boolean> {
   const result = await $`tmux has-session -t ${target}`.quiet().nothrow()
   return result.exitCode === 0
+}
+
+async function detectOrphanedClaude(): Promise<{ pid: number; elapsed: string; cpu: string; mem: string }[]> {
+  const tmuxPids = new Set<string>()
+  const panes = (await $`tmux list-panes -a -F #{pane_pid}`.quiet().nothrow()).text().trim()
+  for (const line of panes.split("\n").filter(Boolean)) tmuxPids.add(line.trim())
+
+  const ps = (await $`ps -eo pid,ppid,pcpu,pmem,etime,comm`.quiet().nothrow()).text()
+  const orphans: { pid: number; elapsed: string; cpu: string; mem: string }[] = []
+  for (const line of ps.split("\n")) {
+    const m = line.match(/^\s*(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+(\S+)\s+(.*)$/)
+    if (!m) continue
+    const [, pidStr, ppid, cpu, mem, elapsed, comm] = m
+    if (!comm.includes("claude")) continue
+    if (ppid !== "1") continue
+    if (tmuxPids.has(pidStr)) continue
+    orphans.push({ pid: parseInt(pidStr), elapsed, cpu, mem })
+  }
+  return orphans
+}
+
+function warnOrphans(orphans: { pid: number; elapsed: string; cpu: string; mem: string }[]) {
+  if (orphans.length === 0) return
+  console.error(`\nWARNING: ${orphans.length} orphaned Claude process(es) detected (PPID=1, no tmux pane):`)
+  for (const o of orphans) {
+    console.error(`  PID ${o.pid}: running ${o.elapsed}, CPU ${o.cpu}%, MEM ${o.mem}%`)
+  }
+  console.error(`  Kill with: kill ${orphans.map(o => o.pid).join(" ")}`)
+  console.error("")
 }
 
 async function isClaudeReady(target: string): Promise<boolean> {
@@ -476,7 +506,11 @@ fleet.command("spawn")
   .option("--scope <scope>", "Session scope: research, implement, or any")
   .option("--tag <tags>", "Comma-separated tags")
   .option("--title <title>", "Custom title for session picker (auto-generated from prompt if omitted)")
+  .option("--resume <sessionId>", "Resume a previous Claude Code session by ID")
   .action(async (name, repoInput, description, opts) => {
+    const orphans = await detectOrphanedClaude()
+    warnOrphans(orphans)
+
     const repo = resolveRepo(repoInput)
     if (!repo) {
       console.error(`ERROR: '${repoInput}' is not a directory and not in repos index. Run 'fleet repos list' to see known repos.`)
@@ -527,9 +561,10 @@ fleet.command("spawn")
         const branchExists = (await $`git -C ${repo} rev-parse --verify ${branch}`.quiet().nothrow()).exitCode === 0
         let wt
         if (branchExists) {
+          await $`git -C ${repo} branch -f ${branch} origin/${defaultBranch}`.quiet().nothrow()
           wt = await $`git -C ${repo} worktree add ${worktreePath} ${branch}`.nothrow()
           console.log(wt.text())
-          console.log(`WORKTREE_CREATED: ${worktreePath} (existing branch: ${branch})`)
+          console.log(`WORKTREE_CREATED: ${worktreePath} (new branch: ${branch} from origin/${defaultBranch})`)
         } else {
           wt = await $`git -C ${repo} worktree add -b ${branch} ${worktreePath} origin/${defaultBranch}`.nothrow()
           console.log(wt.text())
@@ -557,7 +592,29 @@ fleet.command("spawn")
     const sessionId = await tmuxGet(sessionName, FMT_SESSION_ID)
     console.log(`SESSION_CREATED: ${sessionName} (id: ${sessionId})`)
 
-    if (description) {
+    if (opts.resume) {
+      // Resume a previous Claude Code session
+      await tmuxSend(sessionName, `claude --resume ${opts.resume} --dangerously-skip-permissions`)
+
+      const target = `${sessionName}:claude`
+      let started = false
+      for (let elapsed = 0; elapsed < 30_000; elapsed += 500) {
+        const cmd = await tmuxGet(target, FMT_CMD)
+        if (cmd === "claude") { started = true; break }
+        await Bun.sleep(500)
+      }
+      if (!started) {
+        console.error(`ERROR: Claude did not start within 30s`)
+        console.error(`SESSION: ${sessionName} (you can attach manually)`)
+        process.exit(1)
+      }
+      console.log(`RESUMED: ${opts.resume}`)
+      if (description) {
+        await Bun.sleep(3000) // wait for session to load
+        await tmuxSend(sessionName, description)
+        console.log(`PROMPT_SUBMITTED: ${description}`)
+      }
+    } else if (description) {
       // Pass prompt as CLI argument — Claude auto-submits it on start,
       // avoiding the paste-into-TUI + Enter race condition entirely
       const quoted = "'" + description.replace(/'/g, "'\\''") + "'"
@@ -618,6 +675,48 @@ fleet.command("spawn")
     if (tags.length > 0) console.log(`TAGS: ${tags.join(", ")}`)
   })
 
+fleet.command("resume")
+  .description("Resume a crashed/exited session using its Claude Code session ID")
+  .argument("<name>", "Feature name to resume")
+  .argument("[prompt]", "Optional prompt to send after resuming")
+  .action(async (name, prompt) => {
+    const feat = getFeature(name)
+    if (!feat) { console.error(`ERROR: Feature '${name}' not found`); process.exit(1) }
+
+    // Find resume ID from tmux pane
+    const paneContent = (await $`tmux capture-pane -t ${feat.tmuxSession}:claude -p -S -50`.quiet().nothrow()).text()
+    const resumeMatch = paneContent.match(/claude --resume ([a-f0-9-]{36})/)
+    if (!resumeMatch) {
+      console.error(`ERROR: No resume ID found in ${name}'s pane. Session may not have crashed.`)
+      process.exit(1)
+    }
+    const resumeId = resumeMatch[1]
+    console.log(`FOUND_RESUME_ID: ${resumeId}`)
+
+    await tmuxSend(feat.tmuxSession, `claude --resume ${resumeId} --dangerously-skip-permissions`)
+
+    const target = `${feat.tmuxSession}:claude`
+    let started = false
+    for (let elapsed = 0; elapsed < 30_000; elapsed += 500) {
+      const cmd = await tmuxGet(target, FMT_CMD)
+      if (cmd === "claude") { started = true; break }
+      await Bun.sleep(500)
+    }
+    if (!started) {
+      console.error(`ERROR: Claude did not start within 30s`)
+      process.exit(1)
+    }
+    console.log(`RESUMED: ${name} (session: ${resumeId})`)
+
+    if (prompt) {
+      await Bun.sleep(3000)
+      await tmuxSend(feat.tmuxSession, prompt)
+      console.log(`PROMPT_SUBMITTED: ${prompt}`)
+    }
+
+    logEvent(name, "resumed")
+  })
+
 fleet.command("status")
   .description("Snapshot of all active features with live state and pane content")
   .option("--tag <tag>", "Filter by tag")
@@ -625,6 +724,9 @@ fleet.command("status")
   .option("--dump", "Include full pane output for every session")
   .option("--lines <n>", "Lines of scrollback to capture with --dump (default: 100)", "100")
   .action(async (opts) => {
+    const orphans = await detectOrphanedClaude()
+    warnOrphans(orphans)
+
     const reg = readRegistry()
     let active = Object.entries(reg.features).filter(([, f]) => f.status !== "done" && f.status !== "abandoned")
 
@@ -1334,10 +1436,12 @@ fleet.command("poll")
   })
 
 fleet.command("send")
-  .description("Send text to a session (delivered immediately, queued by Claude if busy)")
+  .description("Send text to a session (waits for idle to avoid crashing working sessions)")
   .argument("<name>", "Feature name")
   .argument("<command...>", "Command text to send")
-  .action(async (name, command) => {
+  .option("--force", "Send immediately even if session is working (may trigger [onCancel] cascade)")
+  .option("--wait <seconds>", "Max seconds to wait for idle state (default: 30)", "30")
+  .action(async (name, command, opts) => {
     const feat = requireFeature(name)
     const { state } = await checkSessionState(feat.tmuxSession)
     if (state === "gone" || state === "exited" || state.startsWith("crashed")) {
@@ -1355,16 +1459,38 @@ fleet.command("send")
       console.error(`  Use 'fleet keys ${name} y' or 'fleet keys ${name} n' to respond`)
       process.exit(1)
     }
+
+    let currentState = state
+    if (currentState === "working" && !opts.force) {
+      const maxWait = parseInt(opts.wait) * 1000
+      console.error(`WAITING: Session '${name}' is working. Waiting up to ${opts.wait}s for idle... (--force to skip)`)
+      for (let elapsed = 0; elapsed < maxWait; elapsed += 2000) {
+        await Bun.sleep(2000)
+        const check = await checkSessionState(feat.tmuxSession)
+        currentState = check.state
+        if (currentState === "idle") break
+        if (currentState === "gone" || currentState === "exited" || currentState.startsWith("crashed")) {
+          console.error(`ERROR: Session died while waiting (${currentState}).`)
+          process.exit(1)
+        }
+      }
+      if (currentState === "working") {
+        console.error(`TIMEOUT: Session still working after ${opts.wait}s. Use --force to send anyway.`)
+        process.exit(1)
+      }
+    }
+
     const text = command.join(" ")
     await tmuxSend(feat.tmuxSession, text)
-    console.log(`SENT (state was ${state}): ${text}`)
+    console.log(`SENT (state was ${currentState}): ${text}`)
   })
 
 fleet.command("send-multi")
-  .description("Send the same message to multiple sessions")
+  .description("Send the same message to multiple sessions (skips working sessions unless --force)")
   .argument("<names>", "Comma-separated feature names")
   .argument("<command...>", "Command text to send")
-  .action(async (namesStr: string, command: string[]) => {
+  .option("--force", "Send to working sessions too (may trigger [onCancel] cascade)")
+  .action(async (namesStr: string, command: string[], opts: { force?: boolean }) => {
     const names = namesStr.split(",").map(n => n.trim()).filter(Boolean)
     const text = command.join(" ")
 
@@ -1392,6 +1518,9 @@ fleet.command("send-multi")
       }
       if (state === "picker") { console.log(`SKIP: ${name} is showing a picker`); continue }
       if (state === "blocked") { console.log(`SKIP: ${name} is waiting for confirmation`); continue }
+      if (state === "working" && !opts.force) {
+        console.log(`SKIP: ${name} is working (use --force to send anyway)`); continue
+      }
       await tmuxSend(feat.tmuxSession, text)
       console.log(`SENT to ${name} (state was ${state}): ${text}`)
     }
