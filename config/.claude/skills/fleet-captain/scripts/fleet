@@ -581,10 +581,10 @@ fleet.command("spawn")
     await Promise.all([
       $`tmux set-option -t ${sessionName} @fleet_managed 1`.quiet(),
       $`tmux set-option -t ${sessionName} @claude_task ${title}`.quiet(),
-      $`tmux new-window -d -t ${sessionName}:2 -n util -c ${repo}`.quiet().nothrow(),
+      $`tmux new-window -d -t ${sessionName}:2 -n util -c ${workDir}`.quiet().nothrow(),
     ])
     await Promise.all([
-      $`tmux split-window -d -v -t ${sessionName}:2 -c ${repo}`.quiet().nothrow(),
+      $`tmux split-window -d -v -t ${sessionName}:2 -c ${workDir}`.quiet().nothrow(),
       $`tmux set-option -w -t ${sessionName}:2 monitor-activity off`.quiet().nothrow(),
       $`tmux select-window -t ${sessionName}:1`.quiet().nothrow(),
     ])
