@@ -17,6 +17,7 @@ Persistent state lives under `~/.claude/fleet/`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `description` | string | Prompt sent to the session |
+| `title` | string | Display title for the session (auto-generated from prompt if not specified) |
 | `repo` | string | Absolute path to git repository |
 | `worktreePath` | string\|null | Absolute path to worktree |
 | `branch` | string\|null | Git branch (null if default branch) |
@@ -46,7 +47,7 @@ Append-only NDJSON. Each line:
 |-------|------|-------------|
 | `ts` | string | ISO 8601 |
 | `feature` | string | Feature name |
-| `event` | string | `spawned`, `pushed`, `committed`, `context_warning`, `pr_created`, `abandoned` |
+| `event` | string | `spawned`, `resumed`, `pushed`, `committed`, `context_warning`, `pr_created`, `auto_picked`, `ci_checked`, `ci_monitored`, `shared`, `relayed`, `abandoned` |
 
 ## State Snapshot (`.state_snapshot`)
 

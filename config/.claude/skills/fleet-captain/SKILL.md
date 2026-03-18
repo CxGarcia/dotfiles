@@ -33,7 +33,7 @@ If you catch yourself about to spawn a code-changing session without `--worktree
 
 ## How Events Work
 
-Fleet events appear as "Fleet Events" at the start of each user message, injected by the UserPromptSubmit hook via `fleet poll`. This fires every turn automatically.
+Fleet events appear as "Fleet Events" at the start of each user message, injected by the UserPromptSubmit hook via `fleet poll`. This fires every turn automatically. See [[tmux-reference]] for underlying tmux primitives.
 
 Synthesize events by priority rather than dumping raw data:
 - **P0 (act now):** CI failures, merge conflicts, crashes, pickers, blockers
@@ -47,8 +47,12 @@ When there are no events, respond to the user normally. Idle sessions are normal
 ## Captain's Loop
 
 1. **Read events** — Check "Fleet Events" at the top of the message. Classify by priority.
-2. **Act** — For P0: `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. Queue P1 items for the user. Mention P2 only if relevant.
-3. **Probe when needed** — Use `fleet check-active` or `fleet status` when events suggest something needs attention. Prefer reacting to events over proactive polling, but use your judgment.
+2. **Act on P0 events first** — `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. These can't wait.
+3. **Then handle the user's request** — respond to whatever the user asked. Weave P1 items (new reviews, push failures, idle sessions) into your response where relevant. Mention P2 only if it adds context.
+4. **Probe when needed** — Use `fleet check-active` or `fleet status` when events suggest something needs attention but lack detail. Prefer reacting to events over proactive polling.
+   - **If a session changed to picker/blocked/buffer but the event context is truncated:** `fleet check <name>` to see full context.
+   - **If multiple sessions are active and no events arrived for 3+ turns:** `fleet status` to spot silent failures.
+   - **If no events and user didn't ask about fleet:** respond to the user's request normally. Idle sessions are normal — silence is not failure.
 
 ## CLI Reference
 
@@ -57,23 +61,26 @@ When there are no events, respond to the user normally. Idle sessions are normal
 fleet spawn <name> <repo> "<prompt>" [--worktree] [--branch <name>]
                                        [--scope <scope>] [--tag <tags>]
                                        [--title <title>] [--pr <number>]
+                                       [--resume <sessionId>]
 fleet kill <name> [name2...]           # kill one or many sessions
 fleet kill --all                       # kill all active sessions
 fleet kill --idle                      # kill all idle sessions
 fleet kill --gone                      # clean up gone/exited/crashed sessions
 fleet kill -y ...                      # skip confirmation
+fleet resume <name> [prompt]           # resume a crashed/exited session using its Claude Code session ID
 
 # Monitoring
-fleet status [--tag <t>] [--scope <s>] # snapshot of all features with pane output
+fleet status [--tag <t>] [--scope <s>] [--dump] [--lines <n>]  # snapshot of all features with pane output
 fleet check <name>                     # detailed state of one feature
 fleet check-active                     # state of working/picker/blocked only
 fleet poll                             # non-blocking event + state check (hooks)
+fleet capture [sessions...] [--all] [-S <start>] [-E <end>] [-J] [-e] [-N] [-q]  # capture pane output
 fleet watch [--continuous] [--timeout 60] [--interval 5]  # terminal-only (not for captain session)
 fleet list                             # list fleet-managed tmux sessions
 
 # Interaction
-fleet send <name> "<command>"          # send text to a session
-fleet send-multi <n1,n2> "<cmd>"       # send to multiple sessions
+fleet send <name> "<command>" [--force] [--wait <seconds>]  # send text to a session
+fleet send-multi <n1,n2> "<cmd>" [--force]  # send to multiple sessions
 fleet pick <name> <number>             # select option in a picker
 fleet keys <name> <keys...>            # send raw tmux keys
 
@@ -82,7 +89,7 @@ fleet relay <from> <to> "<context>" [--lines N]  # capture from-output, send to 
 fleet share <file-path> <n1,n2> "<instr>"        # send file path + instruction to sessions
 
 # PR & CI (sessions self-monitor; captain uses --once as fallback)
-fleet pr <name>                        # poll PR CI/reviews/merge until complete
+fleet pr <name> [--timeout <seconds>]   # poll PR CI/reviews/merge until complete
 fleet pr <name> --once                 # one-shot PR status snapshot
 
 # Metadata
@@ -103,6 +110,7 @@ fleet recover                          # reconcile registry after restart
 fleet prune [--keep N]                 # trim events.jsonl
 fleet install                          # symlink fleet to ~/.local/bin
 fleet uninstall                        # remove symlink and completions
+fleet clean-trust [--dry-run]          # remove stale worktree trust entries from ~/.claude.json
 ```
 
 `fleet watch` blocks until events arrive — it's for humans watching the fleet outside of Claude Code. Don't run it in the captain session; background Bash output doesn't interrupt Claude turns, so events would be silently lost.
@@ -111,12 +119,14 @@ fleet uninstall                        # remove symlink and completions
 
 Before spawning, think through the work:
 
-1. **Decompose** — What are the independent work units? Do any depend on each other? Spawn one session per independent unit. If tasks have dependencies, spawn them sequentially or relay results between sessions.
+1. **Decompose** — What are the independent work units? Do any depend on each other?
+   - **If tasks are independent:** spawn one session per unit.
+   - **If tasks have dependencies:** spawn sequentially, or use `fleet relay` to pass results between sessions.
 
 2. **Clarify unknowns** via AskUserQuestion:
-   - **Repo?** If unspecified, ask. Show `fleet repos list` output as options.
-   - **Prompt?** If vague ("fix that thing", "work on auth"), ask for specifics. The prompt is the session's entire mission — make it precise.
-   - **Name?** Generate a short kebab-case name from the prompt (e.g., "Add SSO login" → `sso-login`). Only ask if ambiguous.
+   - **Repo unspecified:** ask. Show `fleet repos list` output as options.
+   - **Prompt vague** ("fix that thing", "work on auth"): ask for specifics. The prompt is the session's entire mission — make it precise.
+   - **Name ambiguous:** generate a short kebab-case name from the prompt (e.g., "Add SSO login" → `sso-login`). Only ask if multiple reasonable names exist.
 
 3. **Set scope** to constrain what a session does:
    - `--scope research` — Reading and analysis only. Include "do not modify any files" in the prompt.
@@ -124,6 +134,16 @@ Before spawning, think through the work:
    - `--scope any` — No constraints (default).
 
 4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include in the prompt: "after pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix the issue and push again. Do not go idle until all checks pass."
+
+### Gate: Ready to Spawn
+
+Before running `fleet spawn`:
+- [ ] All unknowns resolved (repo, prompt specifics)
+- [ ] `--worktree` set for any session that modifies files
+- [ ] Prompt is specific and objective-focused (see Writing Prompts)
+- [ ] CI ownership instruction included for code-pushing sessions
+
+**If any check fails:** resolve before spawning. A vague prompt wastes a session.
 
 ## Writing Prompts
 
@@ -159,6 +179,8 @@ Two workflows are defined:
 - [[workflow-feature-dev]] — brainstorm → plan → work → review → resolve → verify → PR. Can enter at any phase. For features, refactoring, or complex fixes. Always uses `--worktree`.
 - [[workflow-parallel-audit]] — fan-out N sessions for review/simplify/test across subsystems. For codebase-wide sweeps.
 
+> **Dependencies:** Workflow prompts reference skills from other plugins: `/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`, `/workflows:review`, and `/slfg`.
+
 ### Recognizing workflows
 
 | User says | Workflow | Entry point |
@@ -171,13 +193,17 @@ Two workflows are defined:
 | "simplify all the code in X", "run simplifier on X" | parallel-audit (simplify) | fan-out |
 | "write tests for all of X" | parallel-audit (test) | fan-out |
 
-When in doubt, ask the user. When clear, just do it.
+- **If the user's request clearly matches exactly one row:** proceed with that workflow and entry point.
+- **If the request is ambiguous or could match multiple rows:** ask via AskUserQuestion which workflow they want.
+- **If the user gives a direct instruction** ("spawn a session to..."): skip workflow recognition and spawn directly.
 
 ### Constructing the prompt
 
 1. Select the workflow and entry point from the table above.
 2. Read the workflow reference doc for the prompt template.
+   - **If the workflow reference doc is missing:** fall back to writing an objective-focused prompt manually (see Writing Prompts).
 3. Fill in placeholders (`{{description}}`, `{{name}}`, `{{plan_path}}`, etc.).
+   - **If a placeholder value is unknown:** ask the user via AskUserQuestion before spawning.
 4. Spawn with appropriate flags — feature-dev always gets `--worktree`.
 
 ## Branching
@@ -268,50 +294,61 @@ When a session enters `picker` state, Fleet Events will show: `feature: idle →
 
 **Non-trivial pickers** (design decisions, approach choices, architecture):
 1. Run `fleet check <name>` to see the options and pane context.
-2. Default to surfacing these to the user — show the options with context and let them choose. The user often has preferences or context you don't know about.
-3. If the conversation has already established a clear direction, use your judgment — but mention what you picked and why.
+2. **If the user has explicitly discussed this exact decision earlier in the conversation:** pick based on the established direction and tell the user what you chose and why.
+3. **Otherwise:** surface to the user — show the options with context and let them choose. The user often has preferences or context you don't know about.
 
 Examples of non-trivial pickers: "Direct DB insert vs RPC call", "REST vs GraphQL", library choices, data model decisions, any AskUserQuestion from a session.
 
 ### Blockers
 
 Session waiting for y/n confirmation:
-1. `fleet check <name>` — read what it's asking
-2. `fleet keys <name> y` or `fleet keys <name> n`
-3. For anything ambiguous, ask the user
+1. `fleet check <name>` — read what it's asking.
+2. **If the confirmation is about a routine operation** (file overwrite, dependency install, branch switch): `fleet keys <name> y`.
+3. **If the confirmation involves data deletion, force-push, or anything destructive:** ask the user.
+4. **If you can't determine the impact:** ask the user.
 
 ### Rogue sessions
 
-1. `fleet send <name> "Stop — <correction>"` — redirect if idle
-2. If working and ignoring you, `fleet keys <name> C-c` to interrupt, then send correction
-3. If unrecoverable, suggest killing and respawning with a better prompt
+1. **If the session is idle and off-track:** `fleet send <name> "Stop — <correction>"` to redirect.
+2. **If the session is working and hasn't responded to a previous `fleet send` within one turn:** `fleet keys <name> C-c` to interrupt, then send correction.
+3. **If the session has been redirected 2+ times and is still off-track:** suggest killing and respawning with a better prompt.
 
 ### CI failures
 
 Sessions own their CI and fix failures autonomously. The captain intervenes as a fallback when a session goes idle with failing CI:
-1. `fleet pr <name> --once` — check which checks failed
+1. `fleet pr <name> --once` — check which checks failed.
+   - **If no PR is bound:** run `fleet check <name>` to see if a PR URL is in the pane output. If found, bind it with `fleet desc <name> --pr <N>`.
 2. `fleet send <name> "CI is failing on <check>. Fix it, push to branch <branch>, and run 'gh pr checks <number> --watch' to confirm all checks pass before going idle."`
-3. If the PR belongs to someone else, just report to the user
+3. **If the PR belongs to someone else:** just report to the user.
 
 ### Context warnings
 
-A `context_warning` event means the session is compacting context. Watch for repeated actions or forgetting the original task. If it degrades, consider killing and respawning with a fresh prompt that includes progress so far.
+A `context_warning` event means the session is compacting context.
+
+- **If the session continues making progress after compaction:** no action needed.
+- **If the session repeats the same action 2+ times or loses track of its original task:** it has degraded. Kill and respawn with a fresh prompt that includes progress so far (reference the branch and any committed work).
+- **If you can't tell:** `fleet check <name>` to inspect the pane output for signs of looping.
 
 ### Crashed/gone sessions
 
-1. Report which sessions are gone/crashed
-2. Decide whether to respawn based on whether work was committed/pushed
-3. If the branch has commits, respawn with `--branch` to continue
+1. Report which sessions are gone/crashed to the user.
+2. Check whether work was saved:
+   - **If the branch has commits or a PR exists:** respawn with `--worktree --branch <branch>` to continue from existing work.
+   - **If no commits were pushed:** report the loss to the user and ask whether to respawn with the original prompt.
+3. **If the session had a worktree that still exists:** the worktree may contain uncommitted changes. Mention this before killing.
 
 ## Killing & Cleanup
 
 Always get explicit user approval before killing a session. Killing destroys uncommitted work, worktrees, and branches — this is the one area where the captain must not freelance.
 
-Before killing, verify:
+### Gate: Pre-Kill Verification
 
-1. **User approved** — "kill the idle ones" or "yeah kill auth-sso". Not implied, not assumed.
-2. **The session's actual task is complete** — A merged PR doesn't mean "done" if there was post-merge work in the prompt. Check what the session was prompted to do and whether all of it is finished.
-3. **Work is saved** — Run `fleet check <name>`. If there's uncommitted work, warn the user.
+Before running `fleet kill`:
+- [ ] **User approved** — explicit approval ("kill the idle ones", "yeah kill auth-sso"). Not implied, not assumed.
+- [ ] **Task is complete** — a merged PR doesn't mean "done" if there was post-merge work in the prompt. Check the full prompted task.
+- [ ] **Work is saved** — run `fleet check <name>`. If uncommitted work exists, warn the user before proceeding.
+
+**If any check fails:** do not kill. Present the blocker to the user.
 
 | Situation | Safe to kill? |
 |-----------|---------------|
@@ -333,6 +370,10 @@ Guidelines:
 
 `fleet recover` reconciles the registry with live tmux sessions, worktrees, and PRs. Run on startup or after a crash.
 
-The registry (`~/.claude/fleet/registry.json`) is external memory — use `fleet` commands rather than holding feature state in conversation. When context grows large, tell the user to restart the captain. `fleet recover` picks up seamlessly.
+The registry (`~/.claude/fleet/registry.json`, see [[state-schema]]) is external memory — use `fleet` commands rather than holding feature state in conversation. When context grows large, tell the user to restart the captain. `fleet recover` picks up seamlessly.
 
 Keep fleet summaries compressed: "auth-sso pushed branch, PR #42 CI pending" over step-by-step action logs.
+
+## Terminal State
+
+The captain role is continuous. It ends when `fleet status` shows no active features and the user moves on to other work. If the user restarts a captain session later, run `fleet recover` to pick up where things left off.

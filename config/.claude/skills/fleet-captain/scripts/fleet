@@ -318,6 +318,7 @@ async function checkSessionState(target: string, captureLines = 20): Promise<{ s
   // pane_title says idle — auto-suggestion text on the ❯ prompt line is just
   // Claude Code's UI hint, not user input, so we report plain "idle".
   if (title.startsWith("✳")) {
+    if (/^\s*❯\s+\S/m.test(content)) return { state: "buffer", content }
     return { state: "idle", content }
   }
 
@@ -810,7 +811,7 @@ fleet.command("check")
   })
 
 fleet.command("check-active")
-  .description("State of all working/picker/blocked sessions with pane excerpts")
+  .description("State of all working/picker/blocked/buffer sessions with pane excerpts")
   .action(async () => {
     const features = activeFeatures()
     if (features.length === 0) {
@@ -819,7 +820,7 @@ fleet.command("check-active")
     }
 
     const allRows = await buildStatusRows(features)
-    const rows = allRows.filter(r => ["working", "picker", "blocked"].includes(r.state))
+    const rows = allRows.filter(r => ["working", "picker", "blocked", "buffer"].includes(r.state))
 
     if (rows.length === 0) {
       console.log("NO_ACTIVE_SESSIONS (all idle/gone/exited)")
@@ -1857,7 +1858,7 @@ fleet.command("install")
         ["spawn", "Create a new feature session"],
         ["status", "Snapshot of all active features"],
         ["check", "Detailed state of one feature"],
-        ["check-active", "State of working/picker/blocked sessions"],
+        ["check-active", "State of working/picker/blocked/buffer sessions"],
         ["pr", "Monitor PR: CI, reviews, comments, merge state"],
         ["poll", "Non-blocking event + state check (used by hooks)"],
         ["send", "Send text to a session"],
