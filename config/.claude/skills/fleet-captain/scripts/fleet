@@ -11,7 +11,7 @@ const FMT_DEAD = "#{pane_dead}"
 const FMT_DEAD_STATUS = "#{pane_dead_status}"
 const FMT_SESSION_ID = "#{session_id}"
 const FMT_SESSIONS = "#{session_id} #{session_name}"
-const SEP = "\x1f"
+const SEP = "\t"
 const FMT_STATE = `#{pane_current_command}${SEP}#{pane_dead}${SEP}#{pane_dead_status}${SEP}#{pane_title}`
 
 const HOME = homedir()
@@ -318,6 +318,9 @@ async function checkSessionState(target: string, captureLines = 20): Promise<{ s
   // pane_title says idle — auto-suggestion text on the ❯ prompt line is just
   // Claude Code's UI hint, not user input, so we report plain "idle".
   if (title.startsWith("✳")) {
+    // Check status bar for running subagents (e.g. "2 local agents")
+    const statusBar = lines[lines.length - 1] ?? ""
+    if (/\d+ local agents?/.test(statusBar)) return { state: "working", content }
     if (/^\s*❯\s+\S/m.test(content)) return { state: "buffer", content }
     return { state: "idle", content }
   }
