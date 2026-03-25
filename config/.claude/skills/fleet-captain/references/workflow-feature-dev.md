@@ -6,10 +6,10 @@ Autonomous pipeline for building features. A single session advances through pha
 
 | Phase | Does | Produces | Next |
 |-------|------|----------|------|
-| brainstorm | `/workflows:brainstorm` — explores what to build | `docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md` | plan, or work (shortcut) |
-| plan | `/workflows:plan` — designs how to build it | `docs/plans/YYYY-MM-DD-<type>-<topic>-plan.md` | work |
-| work | `/workflows:work` with swarm — implements | Code changes on branch | review |
-| review | `/workflows:review` against plan/brainstorm — verifies correctness, quality, and cleanliness | Findings in `todos/`, auto-fixed divergences | resolve |
+| brainstorm | `/ce:brainstorm` — explores what to build | `docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md` | plan, or work (shortcut) |
+| plan | `/ce:plan` — designs how to build it | `docs/plans/YYYY-MM-DD-<type>-<topic>-plan.md` | work |
+| work | `/ce:work` with swarm — implements | Code changes on branch | review |
+| review | `/ce:review` against plan/brainstorm — verifies correctness, quality, and cleanliness | Findings in `todos/`, auto-fixed divergences | resolve |
 | resolve | Address all review findings using subagents | Fixed code | verify |
 | verify | Run tests, typecheck, build — confirm resolve didn't break anything | Green suite | pr |
 | pr | Commit, push, create PR, monitor CI | Merged PR | done |
@@ -33,16 +33,16 @@ The captain selects the entry point based on context (see recognition table in S
 Use when the user requests a new feature with no existing brainstorm or plan.
 
 ```
-/workflows:brainstorm {{description}}
+/ce:brainstorm {{description}}
 
 After the brainstorm doc is written, immediately proceed to planning. Since you are in an autonomous pipeline, skip all AskUserQuestion prompts and make decisions automatically:
-/workflows:plan (reference the brainstorm doc you just wrote)
+/ce:plan (reference the brainstorm doc you just wrote)
 
 After the plan is written, immediately proceed to work. Make a Task list and launch an army of agent swarm subagents to build the plan. Use teams of agents to divide and conquer — parallelize as much as possible:
-/workflows:work (reference the plan doc you just wrote)
+/ce:work (reference the plan doc you just wrote)
 
 After work is complete, do a deep review of the implementation:
-/workflows:review — cross-reference the implementation vs the brainstorm and plan to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
+/ce:review — cross-reference the implementation vs the brainstorm and plan to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
 
 After review, resolve all findings:
 Address every review finding. Use subagents to divide and conquer — give each a proper slice of findings to handle. Auto-fix divergences from the plan. P1 findings must be fixed before proceeding. If a finding can't be resolved after 3 attempts, escalate to the captain for a design decision or bounce back to brainstorm.
@@ -67,13 +67,13 @@ Use when the user references an existing brainstorm doc.
 
 ```
 Since you are in an autonomous pipeline, skip all AskUserQuestion prompts and make decisions automatically:
-/workflows:plan {{brainstorm_path}}
+/ce:plan {{brainstorm_path}}
 
 After the plan is written, immediately proceed to work. Make a Task list and launch an army of agent swarm subagents to build the plan. Use teams of agents to divide and conquer — parallelize as much as possible:
-/workflows:work (reference the plan doc you just wrote)
+/ce:work (reference the plan doc you just wrote)
 
 After work is complete, do a deep review of the implementation:
-/workflows:review — cross-reference the implementation vs the brainstorm and plan to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
+/ce:review — cross-reference the implementation vs the brainstorm and plan to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
 
 After review, resolve all findings:
 Address every review finding using subagents to divide and conquer. P1 findings must be fixed before proceeding. If a finding can't be resolved after 3 attempts, escalate to the captain for a design decision or bounce back to brainstorm.
@@ -96,10 +96,10 @@ Use when the user references an existing plan doc.
 
 ```
 Make a Task list and launch an army of agent swarm subagents to build the plan. Use teams of agents to divide and conquer — parallelize as much as possible:
-/workflows:work {{plan_path}}
+/ce:work {{plan_path}}
 
 After work is complete, do a deep review of the implementation:
-/workflows:review — cross-reference the implementation vs the plan and any linked brainstorm doc to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
+/ce:review — cross-reference the implementation vs the plan and any linked brainstorm doc to make sure we are solving the issue properly, not missing any gaps, and following code conventions. Also review for code quality and cleanliness: established architecture (api > service > repo), reuse of existing functionality, naming, dead code. Have each review agent write their findings to todos/ so nothing is lost to context compaction.
 
 After review, resolve all findings:
 Address every review finding using subagents to divide and conquer. P1 findings must be fixed before proceeding. If a finding can't be resolved after 3 attempts, escalate to the captain for a design decision or bounce back to brainstorm.

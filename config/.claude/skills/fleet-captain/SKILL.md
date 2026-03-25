@@ -46,13 +46,25 @@ When there are no events, respond to the user normally. Idle sessions are normal
 
 ## Captain's Loop
 
-1. **Read events** — Check "Fleet Events" at the top of the message. Classify by priority.
-2. **Act on P0 events first** — `fleet pick` for pickers, `fleet keys` for blockers, `fleet send` for buffer states. These can't wait.
-3. **Then handle the user's request** — respond to whatever the user asked. Weave P1 items (new reviews, push failures, idle sessions) into your response where relevant. Mention P2 only if it adds context.
-4. **Probe when needed** — Use `fleet check-active` or `fleet status` when events suggest something needs attention but lack detail. Prefer reacting to events over proactive polling.
-   - **If a session changed to picker/blocked/buffer but the event context is truncated:** `fleet check <name>` to see full context.
-   - **If multiple sessions are active and no events arrived for 3+ turns:** `fleet status` to spot silent failures.
-   - **If no events and user didn't ask about fleet:** respond to the user's request normally. Idle sessions are normal — silence is not failure.
+Every turn, in priority order:
+
+1. **Read events** — Check "Fleet Events" at the top of the message.
+   - **Missing or empty:** skip to step 3.
+   - **Present:** classify each as P0/P1/P2.
+
+2. **Act on P0s** — before anything else. Order: pickers → blockers → buffer states → CI failures/crashes.
+   - Follow the matching Intervention procedure for each.
+   - **Insufficient context:** `fleet check <name>` before acting.
+
+3. **Handle the user's request.**
+   - **P1 events** (reviews, push failures, idle): weave into response or mention at the end.
+   - **P2 events** (CI passing, commits, transitions): mention only if the user is tracking that session.
+   - **No events, no fleet question:** respond normally. Do not mention fleet.
+
+4. **Probe if warranted** — no speculative polling.
+   - **Event text truncated for a picker/blocked/buffer session:** `fleet check <name>`.
+   - **3+ turns with active sessions and zero events:** `fleet status` to catch silent failures.
+   - **Otherwise:** do not probe. Silence is not failure.
 
 ## CLI Reference
 
@@ -117,33 +129,44 @@ fleet clean-trust [--dry-run]          # remove stale worktree trust entries fro
 
 ## Spawning
 
-Before spawning, think through the work:
+**ALWAYS spawn in background** (`run_in_background: true`). Worktree creation is slow. See [[workflow-spawning]] for the full procedure including Forge submission instructions.
 
-1. **Decompose** — What are the independent work units? Do any depend on each other?
-   - **If tasks are independent:** spawn one session per unit.
-   - **If tasks have dependencies:** spawn sequentially, or use `fleet relay` to pass results between sessions.
+Resolve each step in order before spawning.
 
-2. **Clarify unknowns** via AskUserQuestion:
-   - **Repo unspecified:** ask. Show `fleet repos list` output as options.
-   - **Prompt vague** ("fix that thing", "work on auth"): ask for specifics. The prompt is the session's entire mission — make it precise.
-   - **Name ambiguous:** generate a short kebab-case name from the prompt (e.g., "Add SSO login" → `sso-login`). Only ask if multiple reasonable names exist.
+1. **Decompose** — Identify independent work units.
+   - **Single task:** one session.
+   - **Multiple independent tasks:** one session per task.
+   - **Dependencies between tasks:** spawn sequentially or use `fleet relay`.
 
-3. **Set scope** to constrain what a session does:
-   - `--scope research` — Reading and analysis only. Include "do not modify any files" in the prompt.
-   - `--scope implement` — Building and coding.
-   - `--scope any` — No constraints (default).
+2. **Resolve the repo.**
+   - **User specified:** use it.
+   - **One repo in `fleet repos list`:** use it.
+   - **Multiple repos:** ask the user — show `fleet repos list` as options.
+   - **No repos indexed:** ask for the path.
 
-4. **CI ownership** — Sessions own their PR lifecycle. For sessions that will push code, include in the prompt: "after pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix the issue and push again. Do not go idle until all checks pass."
+3. **Validate the prompt** — Must contain a **verb** and a **specific target**.
+   - **Clear** ("Fix auth token refresh in `src/auth/refresh.ts`"): proceed.
+   - **Vague** ("fix that thing", "work on auth"): ask the user to specify.
+   - **User insists vague is fine:** proceed — they may have context you don't.
+
+4. **Generate the session name** — Short kebab-case from the target ("Fix auth token refresh" → `fix-auth-refresh`). Only ask if two equally valid names exist.
+
+5. **Set scope:**
+   - `--scope research` — read-only. Include "do not modify any files" in the prompt.
+   - `--scope implement` — building and coding.
+   - `--scope any` — no constraints (default).
+
+6. **CI ownership** — For code-pushing sessions, append: "after pushing, run `gh pr checks <number> --watch` to block until all checks complete. If any check fails, fix and push again. Do not go idle until all checks pass."
 
 ### Gate: Ready to Spawn
 
 Before running `fleet spawn`:
-- [ ] All unknowns resolved (repo, prompt specifics)
+- [ ] Repo resolved to an absolute path
+- [ ] Prompt has verb + specific target
 - [ ] `--worktree` set for any session that modifies files
-- [ ] Prompt is specific and objective-focused (see Writing Prompts)
 - [ ] CI ownership instruction included for code-pushing sessions
 
-**If any check fails:** resolve before spawning. A vague prompt wastes a session.
+**If any check fails:** resolve before spawning.
 
 ## Writing Prompts
 
@@ -172,39 +195,49 @@ The same applies to `fleet send` — when redirecting or unblocking a session, d
 
 ## Workflows
 
-The captain recognizes workflow patterns and constructs session prompts from templates. Workflows are state machines with shortcuts — sessions self-execute through phases autonomously.
+The captain recognizes workflow patterns and constructs prompts from templates. Sessions self-execute through phases autonomously.
 
-Two workflows are defined:
+Seven workflows:
 
-- [[workflow-feature-dev]] — brainstorm → plan → work → review → resolve → verify → PR. Can enter at any phase. For features, refactoring, or complex fixes. Always uses `--worktree`.
-- [[workflow-parallel-audit]] — fan-out N sessions for review/simplify/test across subsystems. For codebase-wide sweeps.
+- [[workflow-spawning]] — session spawning procedure. Always worktree, always background, Forge submission instructions.
+- [[workflow-killing]] — session killing procedure. Always background, always `-y`, captain confirms with user first.
+- [[workflow-feature-work]] — captain's routing: quick fix (Branch A) vs feature pipeline (Branch B). Decision gate + prompt templates.
+- [[workflow-post-submission]] — Forge submission, PR monitoring, rejection handling, merge cleanup.
+- [[workflow-port-forward]] — auto-reconnecting port-forwards and background monitor processes.
+- [[workflow-feature-dev]] — prompt templates for feature dev sessions (brainstorm → plan → work → review → resolve → verify → PR).
+- [[workflow-parallel-audit]] — fan-out N sessions for review/simplify/test across subsystems.
 
-> **Dependencies:** Workflow prompts reference skills from other plugins: `/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`, `/workflows:review`, and `/slfg`.
+> **Dependencies:** Feature-dev requires `/ce:brainstorm`, `/ce:plan`, `/ce:work`, `/ce:review` (from `compound-engineering` plugin) and `/slfg` (from `slfg` plugin). If missing, fall back to objective-focused prompts.
 
 ### Recognizing workflows
 
 | User says | Workflow | Entry point |
 |-----------|----------|-------------|
-| "build feature X", "add X", "implement X" | feature-dev | brainstorm |
-| "here's a brainstorm, plan and build it" | feature-dev | plan |
-| "implement this plan: docs/plans/..." | feature-dev | work |
+| "build feature X", "add X", "implement X" | feature-work | decision gate |
+| "fix bug X", "quick fix", "just fix" | feature-work | decision gate |
+| "here's a brainstorm, plan and build it" | feature-work (Branch B) | plan |
+| "implement this plan: docs/plans/..." | feature-work (Branch B) | work |
 | "slfg", "just do it", "lfg" | feature-dev (compressed) | slfg |
 | "review the codebase", "deep review of X", "audit X" | parallel-audit (review) | fan-out |
 | "simplify all the code in X", "run simplifier on X" | parallel-audit (simplify) | fan-out |
 | "write tests for all of X" | parallel-audit (test) | fan-out |
 
-- **If the user's request clearly matches exactly one row:** proceed with that workflow and entry point.
-- **If the request is ambiguous or could match multiple rows:** ask via AskUserQuestion which workflow they want.
-- **If the user gives a direct instruction** ("spawn a session to..."): skip workflow recognition and spawn directly.
+- **Direct instruction** ("spawn a session to..."): skip recognition, spawn directly.
+- **Matches exactly one row:** proceed with that workflow.
+- **Matches multiple rows** ("review and fix X"): ask the user which workflow.
+- **Matches no row:** not a workflow — spawn with an objective-focused prompt.
 
 ### Constructing the prompt
 
-1. Select the workflow and entry point from the table above.
-2. Read the workflow reference doc for the prompt template.
-   - **If the workflow reference doc is missing:** fall back to writing an objective-focused prompt manually (see Writing Prompts).
-3. Fill in placeholders (`{{description}}`, `{{name}}`, `{{plan_path}}`, etc.).
-   - **If a placeholder value is unknown:** ask the user via AskUserQuestion before spawning.
-4. Spawn with appropriate flags — feature-dev always gets `--worktree`.
+1. Select workflow and entry point from the recognition table.
+2. **If feature work:** read [[workflow-feature-work]] to determine Branch A (quick fix) or Branch B (feature). Use its prompt templates or fall back to [[workflow-feature-dev]] templates.
+3. **If parallel audit:** read [[workflow-parallel-audit]] for the prompt template.
+4. **If compressed (slfg):** use `/slfg` directly.
+   - **Reference doc missing:** fall back to an objective-focused prompt. Tell the user.
+   - **Template references uninstalled skills (`/ce:*`, `/slfg`):** replace with equivalent objective-focused instructions. Tell the user.
+5. Fill in placeholders (`{{description}}`, `{{name}}`, `{{plan_path}}`, etc.).
+   - **Placeholder value unknown:** ask the user before spawning.
+6. Spawn via [[workflow-spawning]] — always `--worktree` for code-changing sessions, always background.
 
 ## Branching
 
@@ -307,6 +340,15 @@ Session waiting for y/n confirmation:
 3. **If the confirmation involves data deletion, force-push, or anything destructive:** ask the user.
 4. **If you can't determine the impact:** ask the user.
 
+### Buffer state
+
+A `buffer` event means unsubmitted text is sitting in the session's input prompt (crashed mid-input or tmux delivered text without Enter).
+
+1. `fleet check <name>` — read the buffered text.
+2. **Valid command/response:** `fleet keys <name> Enter` to submit.
+3. **Garbage or partial text:** `fleet keys <name> C-c` to clear, then `fleet send <name>` with the intended instruction.
+4. **Can't tell:** ask the user.
+
 ### Rogue sessions
 
 1. **If the session is idle and off-track:** `fleet send <name> "Stop — <correction>"` to redirect.
@@ -362,7 +404,10 @@ Guidelines:
 - Present candidates with their state, then ask before executing `fleet kill`
 - `fleet kill --gone` still requires user approval
 - Don't run `fleet kill --idle` without asking — idle is normal
-- Don't use the `-y` flag
+- **ALWAYS use `-y` flag** to skip the CLI prompt (captain asks the user, `-y` is for the CLI)
+- **ALWAYS run in background** (`run_in_background: true`) — worktree cleanup is slow
+
+See [[workflow-killing]] for the full procedure.
 
 `fleet kill` handles tmux session, worktree, branch, and registry cleanup automatically. After killing, verify with `fleet status`.
 
