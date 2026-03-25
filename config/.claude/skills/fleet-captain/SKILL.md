@@ -129,6 +129,8 @@ fleet clean-trust [--dry-run]          # remove stale worktree trust entries fro
 
 ## Spawning
 
+Always read [[workflow-spawning]] when spawning a session.
+
 **ALWAYS spawn in background** (`run_in_background: true`). Worktree creation is slow. See [[workflow-spawning]] for the full procedure including Forge submission instructions.
 
 Resolve each step in order before spawning.
@@ -209,6 +211,8 @@ Seven workflows:
 
 > **Dependencies:** Feature-dev requires `/ce:brainstorm`, `/ce:plan`, `/ce:work`, `/ce:review` (from `compound-engineering` plugin) and `/slfg` (from `slfg` plugin). If missing, fall back to objective-focused prompts.
 
+Always read [[workflow-feature-work]] when routing feature work to determine quick fix vs brainstorm path.
+
 ### Recognizing workflows
 
 | User says | Workflow | Entry point |
@@ -284,6 +288,8 @@ fleet send fix-auth "Commit and push"
 | Quick fix on existing branch | `--worktree --branch <branch>` |
 
 ## Monitoring
+
+Always read [[workflow-post-submission]] after a session submits to Forge.
 
 The hook delivers events every turn. Use manual commands when you need a deeper look:
 
@@ -380,6 +386,8 @@ A `context_warning` event means the session is compacting context.
 3. **If the session had a worktree that still exists:** the worktree may contain uncommitted changes. Mention this before killing.
 
 ## Killing & Cleanup
+
+Always read [[workflow-killing]] when killing sessions.
 
 Always get explicit user approval before killing a session. Killing destroys uncommitted work, worktrees, and branches — this is the one area where the captain must not freelance.
 
