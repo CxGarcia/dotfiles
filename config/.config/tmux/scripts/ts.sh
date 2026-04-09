@@ -43,6 +43,17 @@ engine_boot_command() {
     fi
 }
 
+trimmed_pane_tail() {
+    local target="$1" lines="${2:-8}"
+    tmux capture-pane -t "$target:=claude" -p -S -20 2>/dev/null | awk -v keep="$lines" '
+        NF { buf[++count] = $0 }
+        END {
+            start = count > keep ? count - keep + 1 : 1
+            for (i = start; i <= count; i++) print buf[i]
+        }
+    '
+}
+
 is_codex_idle_tail() {
     local content="$1"
     local trimmed tail
@@ -59,6 +70,16 @@ is_codex_idle_tail() {
     fi
 
     [[ "$tail" == ">" || "$tail" == $'\n>' || "$tail" == *$'\n> '* || "$tail" == *$'\n› '* ]]
+}
+
+is_codex_picker_tail() {
+    local tail="$1"
+
+    if printf '%s\n' "$tail" | grep -Eqi '\[y/n\]|\[Y/n\]|\[yes/no\]|enter to select|enter to confirm|press enter to confirm|space to select|to navigate'; then
+        return 0
+    fi
+
+    printf '%s\n' "$tail" | grep -Eq '^[[:space:]]+/[[:alnum:]][[:alnum:]-]*[[:space:]]{2,}'
 }
 
 resolve_work_dir() {
@@ -129,6 +150,22 @@ render_dot() {
     printf '\033[%sm%s\033[0m' "$color" "●"
 }
 
+is_codex_spinner_title() {
+    local title="$1"
+    [[ "$title" == ?\ * ]] && [[ "$title" != ">\ "* ]] && [[ "$title" != "› "* ]]
+}
+
+codex_title_state() {
+    local title="$1"
+
+    if is_codex_spinner_title "$title"; then
+        printf '%s\n' "working"
+        return 0
+    fi
+
+    return 1
+}
+
 cached_dot_code() {
     local key="$1" now
     [[ -f "$CACHE_FILE" ]] || return 1
@@ -139,7 +176,7 @@ cached_dot_code() {
 }
 
 cheap_dot_code() {
-    local engine="$1" cmd="$2" dead="$3" title="$4"
+    local target="$1" engine="$2" cmd="$3" dead="$4" title="$5"
     if [[ "$dead" == "1" ]]; then
         printf '%s\n' "error"
     elif [[ -z "$engine" || "$engine" == "-" ]]; then
@@ -155,7 +192,17 @@ cheap_dot_code() {
             printf '%s\n' "working"
         fi
     else
-        printf '%s\n' "idle"
+        local tail title_code=""
+        tail=$(trimmed_pane_tail "$target" 8)
+        if is_codex_picker_tail "$tail"; then
+            printf '%s\n' "picker"
+        elif title_code=$(codex_title_state "$title" 2>/dev/null); then
+            printf '%s\n' "$title_code"
+        elif is_codex_idle_tail "$tail"; then
+            printf '%s\n' "idle"
+        else
+            printf '%s\n' "working"
+        fi
     fi
 }
 
@@ -186,10 +233,17 @@ precise_dot_code() {
     fi
 
     local tail
-    tail=$(tmux capture-pane -t "$target:=claude" -p -S -40 2>/dev/null | awk 'NF { lines[++count] = $0 } END { start = count > 5 ? count - 4 : 1; for (i = start; i <= count; i++) print lines[i] }')
+    tail=$(trimmed_pane_tail "$target" 5)
 
-    if printf '%s\n' "$tail" | grep -Eqi '\[y/n\]|\[Y/n\]|\[yes/no\]|enter to select|enter to confirm|press enter to confirm|space to select|to navigate'; then
+    local title_code=""
+    if [[ "$engine" == "codex" ]]; then
+        title_code=$(codex_title_state "$title" || true)
+    fi
+
+    if is_codex_picker_tail "$tail"; then
         printf '%s\n' "picker"
+    elif [[ -n "$title_code" ]]; then
+        printf '%s\n' "$title_code"
     elif [[ "$engine" == "claude" ]]; then
         if [[ "$title" == ✳* ]]; then
             printf '%s\n' "idle"
@@ -246,7 +300,7 @@ list_sessions() {
             local code
             code=$(cached_dot_code "$id")
             if [[ -z "$code" ]]; then
-                code=$(cheap_dot_code "$engine" "$cmd" "$dead" "$title")
+                code=$(cheap_dot_code "$id" "$engine" "$cmd" "$dead" "$title")
             fi
             colorized=$(render_dot "$code")
             printf -v line '%s\t%s\t%s %s\t%s\n' "$id" "$name" "$colorized" "$label" "$repo"
