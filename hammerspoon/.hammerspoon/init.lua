@@ -57,10 +57,32 @@ local applicationHotkeys = {
     s = "Slack"
 }
 
--- Set up the regular application hotkeys
+local appLaunchDoublePressThreshold = 0.5
+local lastAppKeyPressTimes = {}
+
+local function focusOrDoublePressLaunch(key, appName)
+    local app = hs.application.find(appName)
+    if app then
+        app:activate()
+        lastAppKeyPressTimes[key] = 0
+        return
+    end
+
+    local currentTime = hs.timer.secondsSinceEpoch()
+    local lastPressTime = lastAppKeyPressTimes[key] or 0
+
+    if currentTime - lastPressTime < appLaunchDoublePressThreshold then
+        hs.application.launchOrFocus(appName)
+        lastAppKeyPressTimes[key] = 0
+    else
+        lastAppKeyPressTimes[key] = currentTime
+    end
+end
+
+-- Single press focuses running apps; double press launches missing apps.
 for key, app in pairs(applicationHotkeys) do
     hs.hotkey.bind(hyper, key, function()
-        hs.application.launchOrFocus(app)
+        focusOrDoublePressLaunch(key, app)
     end)
 end
 
